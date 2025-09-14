@@ -111,17 +111,17 @@ export async function POST(request: NextRequest) {
 
         console.log(`Processing volunteer response from ${payload.sender_email}: ${sentiment}`)
 
-        // Handle positive responses (volunteer confirmed)
+        // Handle responses instantly without waiting
         if (sentiment === 'positive') {
-          await handleVolunteerConfirmation(payload)
+          handleVolunteerConfirmation(payload) // Don't await - process instantly
         }
         // Handle negative responses (volunteer declined)
         else if (sentiment === 'negative') {
-          await handleVolunteerDecline(payload)
+          handleVolunteerDecline(payload) // Don't await - process instantly
         }
         // Handle questions (send more info)
         else if (sentiment === 'question') {
-          await handleVolunteerQuestion(payload)
+          handleVolunteerQuestion(payload) // Don't await - process instantly
         }
 
         // Record the response in CSV processor
@@ -199,8 +199,9 @@ async function sendDirectEmailReply(
   campaignId?: string
 ) {
   try {
-    // Use the existing email sender service
-    const response = await fetch('/api/email/send', {
+    // Use the existing email sender service with full URL
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+    const response = await fetch(`${baseUrl}/api/email/send`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -327,8 +328,8 @@ async function handleVolunteerConfirmation(payload: any) {
       const result = await response.json()
       console.log(`✅ Volunteer added to calendar: ${volunteerName} for ${eventDetails.event}`)
       
-      // Send confirmation email with event details
-      await sendVolunteerConfirmationEmail(payload.sender_email, volunteerName, eventDetails)
+      // Send confirmation email instantly (don't await)
+      sendVolunteerConfirmationEmail(payload.sender_email, volunteerName, eventDetails)
     } else {
       console.error('Failed to add volunteer to database')
     }
