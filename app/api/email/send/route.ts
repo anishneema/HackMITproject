@@ -3,7 +3,7 @@ import { agentMailEmailSender } from '@/lib/agentmail-email-sender'
 
 export async function POST(request: NextRequest) {
   try {
-    const { contacts, subject, body, eventName } = await request.json()
+    const { contacts, subject, body, eventName, isReply, originalThreadId, replyToEmail } = await request.json()
 
     // Get AgentMail configuration from environment
     const fromName = process.env.SMTP_FROM_NAME || 'Red Cross Events Team'
@@ -39,12 +39,15 @@ export async function POST(request: NextRequest) {
     const campaign = {
       contacts: contacts,
       template: {
-        subject: subject,
+        subject: isReply ? `Re: ${subject}` : subject,
         body: body
       },
       eventName: eventName || 'Blood Drive Event',
       fromEmail: fromEmail,
-      fromName: fromName
+      fromName: fromName,
+      isReply: isReply || false,
+      originalThreadId: originalThreadId,
+      replyToEmail: replyToEmail
     }
 
     // Send emails via AgentMail API
@@ -55,13 +58,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: result.success,
       campaignId: result.campaignId,
-      message: `Email campaign completed: ${result.sent} sent, ${result.failed} failed`,
+      message: isReply ?
+        `Reply sent successfully to ${contacts.length} recipients` :
+        `Email campaign completed: ${result.sent} sent, ${result.failed} failed`,
       details: {
         sent: result.sent,
         failed: result.failed,
         errors: result.errors,
         fromEmail: fromEmail,
-        fromName: fromName
+        fromName: fromName,
+        isReply: isReply || false,
+        originalThreadId: originalThreadId
       }
     })
 

@@ -3,6 +3,7 @@ import { agentMailService } from '@/lib/agent-mail-service'
 import { csvProcessor } from '@/lib/csv-processor'
 import { aiDataManager } from '@/lib/ai-data-manager'
 import { useDashboardStore } from '@/lib/dashboard-store'
+import { conversationManager } from '@/lib/conversation-manager'
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,34 +14,78 @@ export async function POST(request: NextRequest) {
     // Handle incoming email that needs a response
     if (payload.type === 'email_received' && payload.requires_response) {
       try {
-        // For now, generate a simple fallback response
-        let contextualResponse = 'Thank you for your email. We will get back to you soon.'
+        console.log('Processing incoming email reply from:', payload.sender_email)
+        console.log('Message content:', payload.message_content)
 
-        // Try to generate a contextual response if possible
-        try {
-          contextualResponse = await agentMailService.generateContextualResponse(
-            payload.message_content,
-            payload.sender_email
-          )
-        } catch (contextError) {
-          console.warn('Could not generate contextual response, using fallback:', contextError.message)
+        // Use the conversation manager to generate intelligent response
+        const conversationResponse = await conversationManager.generateResponse(
+          payload.message_content,
+          payload.sender_email,
+          payload.thread_id,
+          payload.campaign_id,
+          agentMailService.getDashboardContext()
+        )
 
-          // Fallback contextual response based on message content
-          const messageLower = payload.message_content.toLowerCase()
-          if (messageLower.includes('next event') || messageLower.includes('when')) {
-            contextualResponse = 'Thank you for your interest! Our next blood drive event is "Community Center Blood Drive" scheduled for September 20, 2025 at 9:00 AM - 3:00 PM at Downtown Community Center. We currently have 12 RSVPs out of 50 target donors, so there are 38 spots still available. Would you like me to help you register?'
-          } else if (messageLower.includes('location') || messageLower.includes('where')) {
-            contextualResponse = 'Our next blood drive event will be held at Downtown Community Center on September 20, 2025 at 9:00 AM - 3:00 PM. This location is easily accessible with parking available. Would you like me to send you directions or help you register for this event?'
+        console.log('Generated conversation response:', {
+          content: conversationResponse.content,
+          shouldSend: conversationResponse.should_send,
+          requiresReview: conversationResponse.requires_human_review,
+          actions: conversationResponse.suggested_actions
+        })
+
+        // Send automated reply if appropriate
+        if (conversationResponse.should_send && !conversationResponse.requires_human_review) {
+          try {
+            // Try to send via AgentMail first
+            const replyResult = await agentMailService.replyToEmail(
+              payload.thread_id,
+              conversationResponse.content
+            )
+
+            if (replyResult.success) {
+              console.log('✅ Automated reply sent successfully to:', payload.sender_email)
+            } else {
+              console.log('❌ Failed to send via AgentMail, attempting direct email send')
+
+              // Fallback to direct email sending
+              await sendDirectEmailReply(
+                payload.sender_email,
+                conversationResponse.content,
+                payload.thread_id,
+                payload.campaign_id
+              )
+            }
+          } catch (sendError) {
+            console.error('Failed to send automated reply:', sendError)
+            console.log('Reply will require manual sending:', conversationResponse.content)
           }
+        } else if (conversationResponse.requires_human_review) {
+          console.log('⚠️ Response requires human review:', conversationResponse.content)
+          // Store for human review in dashboard or notification system
+        } else {
+          console.log('🔄 Response generated but not sent automatically:', conversationResponse.content)
         }
 
-        console.log('Generated contextual response:', contextualResponse)
-
-        // For now, just log instead of actually sending email
-        console.log('Would send reply to thread:', payload.thread_id)
+        // Execute suggested actions
+        for (const action of conversationResponse.suggested_actions) {
+          console.log(`Suggested action: ${action.type} - ${action.details}`)
+          await executeSuggestedAction(action, payload)
+        }
 
       } catch (error) {
-        console.error('Failed to process contextual response:', error)
+        console.error('Failed to process email conversation:', error)
+
+        // Send simple fallback response
+        try {
+          await sendDirectEmailReply(
+            payload.sender_email,
+            'Thank you for your email. We will get back to you soon!',
+            payload.thread_id,
+            payload.campaign_id
+          )
+        } catch (fallbackError) {
+          console.error('Failed to send fallback response:', fallbackError)
+        }
       }
     }
 
@@ -133,9 +178,91 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// Helper function to send direct email replies
+async function sendDirectEmailReply(
+  recipientEmail: string,
+  content: string,
+  threadId: string,
+  campaignId?: string
+) {
+  try {
+    // Use the existing email sender service
+    const response = await fetch('/api/email/send', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contacts: [{
+          email: recipientEmail,
+          firstName: 'Valued',
+          lastName: 'Donor'
+        }],
+        subject: 'Re: Blood Drive Event',
+        body: content,
+        eventName: 'Blood Drive Conversation',
+        isReply: true,
+        originalThreadId: threadId
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to send direct email reply')
+    }
+
+    console.log('✅ Direct email reply sent successfully')
+    return true
+  } catch (error) {
+    console.error('Failed to send direct email reply:', error)
+    return false
+  }
+}
+
+// Helper function to execute suggested actions
+async function executeSuggestedAction(
+  action: { type: string; details: string },
+  payload: any
+) {
+  try {
+    switch (action.type) {
+      case 'schedule_appointment':
+        console.log('📅 Would schedule appointment for:', payload.sender_email)
+        // Integration point for calendar scheduling
+        break
+
+      case 'send_info':
+        console.log('📋 Would send additional information to:', payload.sender_email)
+        // Integration point for sending brochures/info
+        break
+
+      case 'escalate':
+        console.log('🚨 Escalating to human staff:', payload.sender_email)
+        // Integration point for staff notifications
+        break
+
+      case 'close_conversation':
+        console.log('✅ Closing conversation with:', payload.sender_email)
+        conversationManager.markThreadAsCompleted(payload.thread_id)
+        break
+
+      default:
+        console.log('Unknown action type:', action.type)
+    }
+  } catch (error) {
+    console.error('Failed to execute suggested action:', error)
+  }
+}
+
 export async function GET() {
   return NextResponse.json({
-    message: 'Agent Mail webhook endpoint',
-    timestamp: new Date().toISOString()
+    message: 'Agent Mail webhook endpoint with conversation AI',
+    timestamp: new Date().toISOString(),
+    features: [
+      'Intelligent conversation responses via Claude',
+      'Automated reply sending',
+      'Conversation state tracking',
+      'Suggested action execution',
+      'Human review flagging'
+    ]
   })
 }
