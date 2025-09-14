@@ -89,7 +89,8 @@ export async function POST(request: NextRequest) {
     // Analyze message with Claude and decide on reply
     const replyDecision = await analyzeMessageAndGenerateReply(message)
 
-    if (replyDecision.shouldReply && replyDecision.confidence >= WEBHOOK_CONFIG.MIN_CONFIDENCE_THRESHOLD) {
+    // ALWAYS reply to emails - at minimum with a thank you
+    if (replyDecision.shouldReply) {
       console.log(`🤖 Sending ${replyDecision.replyType} reply to ${message.from} (confidence: ${replyDecision.confidence})`)
       
       // Add delay to respect rate limits
@@ -117,12 +118,31 @@ export async function POST(request: NextRequest) {
         }, { status: 500 })
       }
     } else {
-      webhookStats.incrementRepliesSkipped()
-      console.log(`🔇 No reply needed (shouldReply: ${replyDecision.shouldReply}, confidence: ${replyDecision.confidence})`)
-      return NextResponse.json({
-        success: true,
-        message: 'No reply needed'
-      })
+      // Fallback: Send a basic thank you if Claude says not to reply
+      console.log(`🤖 Claude said no reply, but sending basic thank you to ${message.from}`)
+      
+      const fallbackReply = "Thank you for contacting us! We appreciate your message and will get back to you soon. If this is regarding our blood drive event, please visit our website for more information."
+      
+      const replySent = await sendAgentMailReply(message, fallbackReply)
+      
+      if (replySent) {
+        webhookStats.incrementRepliesSent()
+        console.log('✅ Fallback thank you reply sent successfully')
+        
+        return NextResponse.json({
+          success: true,
+          message: 'Fallback reply sent automatically',
+          replyType: 'thank_you',
+          confidence: 0.5
+        })
+      } else {
+        webhookStats.incrementErrors()
+        console.error('❌ Failed to send fallback reply')
+        return NextResponse.json({
+          success: false,
+          message: 'Fallback reply failed to send'
+        }, { status: 500 })
+      }
     }
 
   } catch (error) {
@@ -138,17 +158,16 @@ async function analyzeMessageAndGenerateReply(message: any): Promise<ReplyDecisi
   try {
     const systemPrompt = `You are an AI assistant for a Red Cross blood drive organization. Your job is to analyze incoming email messages and decide:
 
-1. Should we reply to this message? (YES/NO)
+1. Should we reply to this message? (ALWAYS YES unless it's clearly spam or an auto-response)
 2. What type of reply should we send?
 3. What should the reply content be?
 
 REPLY TYPES:
-- thank_you: Simple thank you for positive responses
+- thank_you: Simple thank you for any message
 - information: Provide event details, location, requirements
 - scheduling: Help with appointment booking
 - question_response: Answer specific questions
 - polite_decline: Polite response to negative replies
-- no_reply: Don't reply (for spam, auto-responses, etc.)
 
 CURRENT EVENT CONTEXT:
 - Next Event: Community Center Blood Drive on September 20, 2025
@@ -157,13 +176,13 @@ CURRENT EVENT CONTEXT:
 - Available spots: 38 out of 50
 
 GUIDELINES:
+- ALWAYS reply to emails - be helpful and responsive
 - Always be polite and professional
 - Keep replies concise but helpful (2-3 sentences max)
 - For positive interest, provide event details and next steps
 - For questions, answer specifically and offer additional help
-- For negative responses, thank them politely and wish them well
-- For spam or irrelevant messages, don't reply
-- Don't reply to auto-responses, out-of-office messages, or newsletters
+- For general messages, send a friendly thank you with event info
+- Only skip replies for obvious spam or auto-responses (out-of-office, newsletters)
 
 IMPORTANT: You must respond with ONLY a valid JSON object. Do not include any other text, explanation, or commentary.
 
