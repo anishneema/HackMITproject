@@ -5,12 +5,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Calendar, ChevronLeft, ChevronRight, Clock, Users, MapPin } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Calendar, ChevronLeft, ChevronRight, Clock, Users, MapPin, Phone, Mail } from "lucide-react"
 
 export function VolunteerCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date())
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
-  // Sample volunteer data
+  // Sample volunteer data with 2025 dates
   const volunteers = [
     {
       id: 1,
@@ -18,8 +21,9 @@ export function VolunteerCalendar() {
       role: "Nurse",
       avatar: "/placeholder.svg?height=32&width=32",
       shifts: [
-        { date: "2024-12-16", time: "9:00 AM - 1:00 PM", event: "Community Center Drive" },
-        { date: "2024-12-18", time: "10:00 AM - 2:00 PM", event: "University Campus Drive" },
+        { date: "2025-09-14", time: "9:00 AM - 1:00 PM", event: "Community Center Drive" },
+        { date: "2025-09-18", time: "10:00 AM - 2:00 PM", event: "University Campus Drive" },
+        { date: "2025-09-25", time: "8:00 AM - 12:00 PM", event: "Mall Plaza Drive" },
       ],
     },
     {
@@ -28,8 +32,9 @@ export function VolunteerCalendar() {
       role: "Registration",
       avatar: "/placeholder.svg?height=32&width=32",
       shifts: [
-        { date: "2024-12-16", time: "8:30 AM - 12:30 PM", event: "Community Center Drive" },
-        { date: "2024-12-20", time: "12:00 PM - 4:00 PM", event: "Corporate Office Drive" },
+        { date: "2025-09-14", time: "8:30 AM - 12:30 PM", event: "Community Center Drive" },
+        { date: "2025-09-20", time: "12:00 PM - 4:00 PM", event: "Corporate Office Drive" },
+        { date: "2025-09-28", time: "9:30 AM - 1:30 PM", event: "Tech Campus Drive" },
       ],
     },
     {
@@ -38,9 +43,10 @@ export function VolunteerCalendar() {
       role: "Phlebotomist",
       avatar: "/placeholder.svg?height=32&width=32",
       shifts: [
-        { date: "2024-12-16", time: "9:00 AM - 1:00 PM", event: "Community Center Drive" },
-        { date: "2024-12-18", time: "10:00 AM - 2:00 PM", event: "University Campus Drive" },
-        { date: "2024-12-20", time: "1:00 PM - 5:00 PM", event: "Corporate Office Drive" },
+        { date: "2025-09-14", time: "9:00 AM - 1:00 PM", event: "Community Center Drive" },
+        { date: "2025-09-18", time: "10:00 AM - 2:00 PM", event: "University Campus Drive" },
+        { date: "2025-09-20", time: "1:00 PM - 5:00 PM", event: "Corporate Office Drive" },
+        { date: "2025-09-25", time: "8:30 AM - 12:30 PM", event: "Mall Plaza Drive" },
       ],
     },
     {
@@ -49,30 +55,65 @@ export function VolunteerCalendar() {
       role: "Setup Crew",
       avatar: "/placeholder.svg?height=32&width=32",
       shifts: [
-        { date: "2024-12-16", time: "7:00 AM - 11:00 AM", event: "Community Center Drive" },
-        { date: "2024-12-18", time: "8:00 AM - 12:00 PM", event: "University Campus Drive" },
+        { date: "2025-09-14", time: "7:00 AM - 11:00 AM", event: "Community Center Drive" },
+        { date: "2025-09-18", time: "8:00 AM - 12:00 PM", event: "University Campus Drive" },
+        { date: "2025-09-20", time: "11:00 AM - 3:00 PM", event: "Corporate Office Drive" },
+      ],
+    },
+    {
+      id: 5,
+      name: "Lisa Thompson",
+      role: "Medical Assistant",
+      avatar: "/placeholder.svg?height=32&width=32",
+      shifts: [
+        { date: "2025-09-18", time: "9:30 AM - 1:30 PM", event: "University Campus Drive" },
+        { date: "2025-09-25", time: "10:00 AM - 2:00 PM", event: "Mall Plaza Drive" },
+        { date: "2025-09-28", time: "8:00 AM - 12:00 PM", event: "Tech Campus Drive" },
+      ],
+    },
+    {
+      id: 6,
+      name: "James Wilson",
+      role: "Cleanup Crew",
+      avatar: "/placeholder.svg?height=32&width=32",
+      shifts: [
+        { date: "2025-09-14", time: "12:30 PM - 4:30 PM", event: "Community Center Drive" },
+        { date: "2025-09-20", time: "3:00 PM - 7:00 PM", event: "Corporate Office Drive" },
+        { date: "2025-09-28", time: "1:00 PM - 5:00 PM", event: "Tech Campus Drive" },
       ],
     },
   ]
 
   const events = [
     {
-      date: "2024-12-16",
+      date: "2025-09-14",
       name: "Community Center Drive",
-      location: "Community Center",
-      volunteers: volunteers.filter((v) => v.shifts.some((s) => s.date === "2024-12-16")),
+      location: "Community Center Hall",
+      volunteers: volunteers.filter((v) => v.shifts.some((s) => s.date === "2025-09-14")),
     },
     {
-      date: "2024-12-18",
+      date: "2025-09-18",
       name: "University Campus Drive",
-      location: "University Campus",
-      volunteers: volunteers.filter((v) => v.shifts.some((s) => s.date === "2024-12-18")),
+      location: "University Student Center",
+      volunteers: volunteers.filter((v) => v.shifts.some((s) => s.date === "2025-09-18")),
     },
     {
-      date: "2024-12-20",
+      date: "2025-09-20",
       name: "Corporate Office Drive",
-      location: "Corporate Office",
-      volunteers: volunteers.filter((v) => v.shifts.some((s) => s.date === "2024-12-20")),
+      location: "TechCorp Headquarters",
+      volunteers: volunteers.filter((v) => v.shifts.some((s) => s.date === "2025-09-20")),
+    },
+    {
+      date: "2025-09-25",
+      name: "Mall Plaza Drive",
+      location: "Central Mall Atrium",
+      volunteers: volunteers.filter((v) => v.shifts.some((s) => s.date === "2025-09-25")),
+    },
+    {
+      date: "2025-09-28",
+      name: "Tech Campus Drive",
+      location: "Innovation Tech Campus",
+      volunteers: volunteers.filter((v) => v.shifts.some((s) => s.date === "2025-09-28")),
     },
   ]
 
@@ -103,6 +144,42 @@ export function VolunteerCalendar() {
     if (!day) return null
     const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
     return events.find((event) => event.date === dateStr)
+  }
+
+  const handleDateClick = (day: number) => {
+    if (!day) return
+    const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+    setSelectedDate(dateStr)
+    setIsModalOpen(true)
+  }
+
+  const getSelectedEventDetails = () => {
+    if (!selectedDate) return null
+    const event = events.find((event) => event.date === selectedDate)
+    if (!event) return null
+
+    // Get all volunteer shifts for this date with more details
+    const volunteerShifts = volunteers
+      .filter(volunteer => volunteer.shifts.some(shift => shift.date === selectedDate))
+      .map(volunteer => {
+        const shift = volunteer.shifts.find(s => s.date === selectedDate)
+        return {
+          ...volunteer,
+          shiftTime: shift?.time,
+          shiftEvent: shift?.event
+        }
+      })
+
+    return {
+      ...event,
+      volunteerShifts,
+      formattedDate: new Date(selectedDate).toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      })
+    }
   }
 
   const navigateMonth = (direction: "prev" | "next") => {
@@ -176,9 +253,10 @@ export function VolunteerCalendar() {
               return (
                 <div
                   key={index}
-                  className={`min-h-[100px] p-2 border rounded-lg ${
-                    day ? "bg-card hover:bg-accent/50" : "bg-muted/20"
-                  } ${event ? "border-primary/50 bg-primary/5" : "border-border"}`}
+                  className={`min-h-[100px] p-2 border rounded-lg cursor-pointer transition-all duration-200 ${
+                    day ? "bg-card hover:bg-accent/50 hover:shadow-md" : "bg-muted/20"
+                  } ${event ? "border-primary/50 bg-primary/5 hover:bg-primary/10" : "border-border"}`}
+                  onClick={() => handleDateClick(day)}
                 >
                   {day && (
                     <>
@@ -303,6 +381,119 @@ export function VolunteerCalendar() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Event Details Modal */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              Event Details
+            </DialogTitle>
+            <DialogDescription>
+              Detailed information about the selected date
+            </DialogDescription>
+          </DialogHeader>
+          
+          {(() => {
+            const eventDetails = getSelectedEventDetails()
+            if (!eventDetails) {
+              return (
+                <div className="py-8 text-center text-muted-foreground">
+                  <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <h3 className="text-lg font-medium mb-2">No Event Scheduled</h3>
+                  <p>There are no blood drive events scheduled for {eventDetails?.formattedDate || selectedDate}</p>
+                </div>
+              )
+            }
+
+            return (
+              <div className="space-y-6">
+                {/* Event Header */}
+                <div className="bg-primary/5 p-4 rounded-lg border">
+                  <h3 className="text-xl font-semibold mb-2">{eventDetails.name}</h3>
+                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-1">
+                      <Calendar className="h-4 w-4" />
+                      {eventDetails.formattedDate}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <MapPin className="h-4 w-4" />
+                      {eventDetails.location}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Event Stats */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-card p-3 rounded-lg border text-center">
+                    <Users className="h-6 w-6 mx-auto mb-2 text-primary" />
+                    <div className="text-2xl font-bold">{eventDetails.volunteerShifts.length}</div>
+                    <div className="text-xs text-muted-foreground">Volunteers</div>
+                  </div>
+                  <div className="bg-card p-3 rounded-lg border text-center">
+                    <Clock className="h-6 w-6 mx-auto mb-2 text-secondary" />
+                    <div className="text-2xl font-bold">{eventDetails.volunteerShifts.length}</div>
+                    <div className="text-xs text-muted-foreground">Shifts</div>
+                  </div>
+                  <div className="bg-card p-3 rounded-lg border text-center">
+                    <Badge variant="outline" className="text-lg px-3 py-1">
+                      Active
+                    </Badge>
+                    <div className="text-xs text-muted-foreground mt-1">Status</div>
+                  </div>
+                  <div className="bg-card p-3 rounded-lg border text-center">
+                    <div className="text-2xl font-bold text-green-600">100%</div>
+                    <div className="text-xs text-muted-foreground">Coverage</div>
+                  </div>
+                </div>
+
+                {/* Volunteer Schedule */}
+                <div>
+                  <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Volunteer Schedule
+                  </h4>
+                  <div className="space-y-3">
+                    {eventDetails.volunteerShifts.map((volunteer) => (
+                      <div key={volunteer.id} className="flex items-center justify-between p-3 bg-card border rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage src={volunteer.avatar || "/placeholder.svg"} />
+                            <AvatarFallback>
+                              {volunteer.name.split(" ").map((n) => n[0]).join("")}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium">{volunteer.name}</p>
+                            <p className="text-sm text-muted-foreground">{volunteer.role}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <Badge variant="secondary" className="text-xs">
+                            {volunteer.shiftTime}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Event Notes */}
+                <div className="bg-muted/50 p-4 rounded-lg">
+                  <h4 className="font-medium mb-2">Event Notes</h4>
+                  <ul className="text-sm space-y-1 text-muted-foreground">
+                    <li>• All volunteers have been confirmed</li>
+                    <li>• Venue setup begins 2 hours before event start</li>
+                    <li>• Parking available at the venue</li>
+                    <li>• Refreshments will be provided for volunteers</li>
+                  </ul>
+                </div>
+              </div>
+            )
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

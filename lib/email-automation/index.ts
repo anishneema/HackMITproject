@@ -1,0 +1,10 @@
+export * from './types'
+export * from './csv-reader'
+export * from './email-sender'
+export * from './email-monitor'
+export * from './sentiment-analyzer'
+export * from './response-generator'
+export * from './follow-up-scheduler'
+export * from './email-automation-engine'
+
+export { default as EmailAutomationEngine } from './email-automation-engine'

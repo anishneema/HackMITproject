@@ -5,7 +5,6 @@ import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { Bot, User, Send, Upload, Calendar, MapPin, Mail, Users, CheckCircle, Clock, AlertCircle } from "lucide-react"
 
@@ -27,7 +26,7 @@ export function AIAssistant() {
       id: "1",
       type: "assistant",
       content:
-        "Hello! I'm your Blood Drive AI Assistant. I can help you set up new blood drives by automatically handling venue research, donor outreach, and coordination. To get started, just tell me you'd like to create a new event and I'll guide you through the process.",
+        "Hello! I'm your intelligent Blood Drive AI Assistant. I have access to real-time dashboard data and can help you with:\n\n• Answering questions about events, volunteers, and analytics\n• Creating new blood drive events\n• Processing CSV uploads for donor outreach\n• Providing insights and recommendations\n\nTry asking: \"How many volunteers do we have on Thursday September 14th?\" or \"What's our email response rate for the community center drive?\"",
       timestamp: new Date(),
     },
   ])
@@ -38,7 +37,11 @@ export function AIAssistant() {
 
   useEffect(() => {
     if (scrollAreaRef.current) {
-      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight
+      // Smooth scroll to bottom when new messages are added
+      scrollAreaRef.current.scrollTo({
+        top: scrollAreaRef.current.scrollHeight,
+        behavior: 'smooth'
+      })
     }
   }, [messages])
 
@@ -73,6 +76,19 @@ export function AIAssistant() {
   const getAIResponse = (input: string): string => {
     const lowerInput = input.toLowerCase()
 
+    // Dashboard data queries
+    if (lowerInput.includes("how many") && (lowerInput.includes("volunteer") || lowerInput.includes("people")) && lowerInput.includes("thursday") && lowerInput.includes("sept")) {
+      return "Based on the dashboard data, for the Community Center Blood Drive event happening on Thursday, September 14, 2025, we currently have 23 RSVPs.\n\nThe event details show:\n• Date: Thursday, September 14, 2025 at 9:00 AM\n• Venue: Community Center Hall\n• Target Donors: 50\n• Current RSVPs: 23\n• Emails Sent: 120\n• Emails Opened: 78\n• Emails Replied: 31\n\nSo to answer your question directly, we currently have 23 people booked for the Thursday, September 14th event at the Community Center."
+    }
+
+    if (lowerInput.includes("email response rate") || lowerInput.includes("email rate")) {
+      return "Based on the dashboard data:\n\n• Email Open Rate: 68%\n• Click-through Rate: 42%\n• RSVP Conversion Rate: 36%\n• Overall Email Response Rate: 65%\n\nFor the Community Center drive specifically:\n• 120 emails sent\n• 78 opened (65%)\n• 31 replies (26%)\n• 23 RSVPs confirmed (19% conversion)\n\nThe response rates are above industry average for blood drive campaigns."
+    }
+
+    if (lowerInput.includes("dashboard") || lowerInput.includes("analytics") || lowerInput.includes("metrics")) {
+      return "Here's your current dashboard overview:\n\n📊 Quick Stats:\n• Active Drives: 3\n• Total Donors: 83\n• AI Actions: 247\n• Success Rate: 94%\n\n📈 Campaign Performance:\n• Community Center Drive: 26% conversion (23/89)\n• University Campus Drive: 34% conversion (42/124)\n• Corporate Office Drive: 27% conversion (18/67)\n\n🎯 Recent AI Actions:\n• Venue research completed for 2 locations\n• 247 personalized emails sent\n• 89 SMS follow-ups scheduled\n• 3 venue confirmations received"
+    }
+
     if (lowerInput.includes("new event") || lowerInput.includes("create") || lowerInput.includes("blood drive")) {
       return "Great! I'll help you create a new blood drive. I need some details:\n\n1. What date are you planning for?\n2. What's your target number of donors?\n3. Do you have a preferred location or should I research venues?\n4. What's the event name?\n\nOnce you provide these details, I'll automatically start researching venues and preparing outreach materials."
     }
@@ -85,7 +101,7 @@ export function AIAssistant() {
       return "Perfect! I'll set up the donor outreach campaign. Please upload your CSV file with donor contacts, and I'll automatically send personalized invitations, schedule follow-up reminders, and track RSVPs."
     }
 
-    return "I understand. Let me help you with that. I'll start working on the automated processes and keep you updated on the progress through the dashboard."
+    return "I understand. Let me help you with that. I can provide insights on event performance, volunteer schedules, donor engagement metrics, or help you create new blood drives. What would you like to know?"
   }
 
   const getAIActions = (input: string): Message["actions"] => {
@@ -173,73 +189,74 @@ export function AIAssistant() {
   }
 
   return (
-    <div className="flex flex-col h-[600px]">
+    <div className="flex flex-col h-full max-h-[600px]">
       {/* Chat Messages */}
-      <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
-        <div className="space-y-4">
-          {messages.map((message) => (
-            <div key={message.id} className={`flex gap-3 ${message.type === "user" ? "justify-end" : "justify-start"}`}>
-              {message.type === "assistant" && (
-                <div className="flex items-center justify-center w-8 h-8 bg-primary rounded-full flex-shrink-0">
-                  <Bot className="h-4 w-4 text-primary-foreground" />
-                </div>
-              )}
-
-              <div className={`max-w-[80%] ${message.type === "user" ? "order-first" : ""}`}>
-                <div
-                  className={`p-3 rounded-lg ${
-                    message.type === "user" ? "bg-primary text-primary-foreground ml-auto" : "bg-muted"
-                  }`}
-                >
-                  <p className="whitespace-pre-wrap">{message.content}</p>
-                </div>
-
-                {/* AI Actions */}
-                {message.actions && message.actions.length > 0 && (
-                  <div className="mt-2 space-y-2">
-                    {message.actions.map((action, index) => (
-                      <div key={index} className="flex items-center gap-2 p-2 bg-card border rounded-lg text-sm">
-                        {getActionIcon(action.type)}
-                        <span className="flex-1">{action.details}</span>
-                        {getStatusIcon(action.status)}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <p className="text-xs text-muted-foreground mt-1">{message.timestamp.toLocaleTimeString()}</p>
-              </div>
-
-              {message.type === "user" && (
-                <div className="flex items-center justify-center w-8 h-8 bg-secondary rounded-full flex-shrink-0">
-                  <User className="h-4 w-4 text-secondary-foreground" />
-                </div>
-              )}
-            </div>
-          ))}
-
-          {isTyping && (
-            <div className="flex gap-3 justify-start">
-              <div className="flex items-center justify-center w-8 h-8 bg-primary rounded-full">
+      <div 
+        className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0" 
+        ref={scrollAreaRef}
+      >
+        {messages.map((message) => (
+          <div key={message.id} className={`flex gap-3 ${message.type === "user" ? "justify-end" : "justify-start"}`}>
+            {message.type === "assistant" && (
+              <div className="flex items-center justify-center w-8 h-8 bg-primary rounded-full flex-shrink-0">
                 <Bot className="h-4 w-4 text-primary-foreground" />
               </div>
-              <div className="bg-muted p-3 rounded-lg">
-                <div className="flex gap-1">
-                  <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
-                  <div
-                    className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"
-                    style={{ animationDelay: "0.1s" }}
-                  ></div>
-                  <div
-                    className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"
-                    style={{ animationDelay: "0.2s" }}
-                  ></div>
+            )}
+
+            <div className={`max-w-[80%] ${message.type === "user" ? "order-first" : ""}`}>
+              <div
+                className={`p-3 rounded-lg ${
+                  message.type === "user" ? "bg-primary text-primary-foreground ml-auto" : "bg-muted"
+                }`}
+              >
+                <p className="whitespace-pre-wrap">{message.content}</p>
+              </div>
+
+              {/* AI Actions */}
+              {message.actions && message.actions.length > 0 && (
+                <div className="mt-2 space-y-2">
+                  {message.actions.map((action, index) => (
+                    <div key={index} className="flex items-center gap-2 p-2 bg-card border rounded-lg text-sm">
+                      {getActionIcon(action.type)}
+                      <span className="flex-1">{action.details}</span>
+                      {getStatusIcon(action.status)}
+                    </div>
+                  ))}
                 </div>
+              )}
+
+              <p className="text-xs text-muted-foreground mt-1">{message.timestamp.toLocaleTimeString()}</p>
+            </div>
+
+            {message.type === "user" && (
+              <div className="flex items-center justify-center w-8 h-8 bg-secondary rounded-full flex-shrink-0">
+                <User className="h-4 w-4 text-secondary-foreground" />
+              </div>
+            )}
+          </div>
+        ))}
+
+        {isTyping && (
+          <div className="flex gap-3 justify-start">
+            <div className="flex items-center justify-center w-8 h-8 bg-primary rounded-full">
+              <Bot className="h-4 w-4 text-primary-foreground" />
+            </div>
+            <div className="bg-muted p-3 rounded-lg">
+              <div className="flex gap-1">
+                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
+                <div
+                  className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"
+                  style={{ animationDelay: "0.1s" }}
+                ></div>
+                <div
+                  className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"
+                  style={{ animationDelay: "0.2s" }}
+                ></div>
               </div>
             </div>
-          )}
-        </div>
-      </ScrollArea>
+          </div>
+        )}
+      </div>
 
       <Separator />
 
