@@ -492,7 +492,7 @@ Your new blood drive event has been added to the calendar and is now active. You
       
       // Add an error message to the chat
       if (activeSessionId) {
-        addMessage(activeSessionId, {
+    addMessage(activeSessionId, {
           type: "assistant",
           content: `❌ **Failed to Create Event**
 
@@ -651,7 +651,7 @@ Your contacts will receive personalized emails about the upcoming blood drive ev
         
         // Use context to customize the email template if provided
         let emailTemplate = {
-          subject: "Join Us for a Life-Saving Blood Drive!",
+            subject: "Join Us for a Life-Saving Blood Drive!",
           body: `Hello {{firstName}},
 
 We hope this message finds you well. We're reaching out to invite you to participate in our upcoming blood drive.
@@ -918,7 +918,7 @@ Red Cross Events Team`
                 </div>
               </div>
             )}
-        </div>
+          </div>
 
         <Separator />
 

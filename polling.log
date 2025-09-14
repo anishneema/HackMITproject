@@ -1,0 +1,264 @@
+[dotenv@17.2.2] injecting env (4) from .env.local -- tip: ⚙️  enable debug logging with { debug: true }
+🚀 Starting email polling system (checking every 5 seconds)
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+✅ Polling system started successfully
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 1 unprocessed external messages
+
+📧 Processing: Dheeraj Tallapragada <tsaidheeraj@gmail.com>
+   Subject: Re: Join Us for unc!
+   Message ID: <CAKHkVfV4TVZpTiuPrn7JqsVNkMvYO99yS1VmLBaucBXZdnpjUw@mail.gmail.com>
+   Content: Yes, I'd like to participate.
+
+On Sun, Sep 14, 2025 at 9:02 AM orcha- Blood Drive <orcha@agentmail.t...
+   🤖 Processing with Claude AI...
+   ✅ Reply generated: attendance_confirmed (confidence: 0.95)
+   📝 Reply content: Thank you for confirming your attendance at the University Campus Blood Drive on September 25, 2025. We have added you to the event calendar and look forward to your participation. Please remember to arrive between 10:00 AM and 4:00 PM at the University Student Center, 456 College Ave. Bring a photo ID, and be sure to eat a good meal and drink plenty of water prior to your donation. We appreciate your support in helping to save lives through this important event.
+   📅 ATTENDANCE CONFIRMED! Adding to calendar...
+📅 No specific event detected, defaulting to Community Center Drive
+📅 Detected event details: {
+  eventId: 'community-center-blood-drive-2025-09-20',
+  eventName: 'Community Center Blood Drive',
+  startTime: 2025-09-20T13:00:00.000Z,
+  endTime: 2025-09-20T19:00:00.000Z,
+  location: 'Downtown Community Center, 123 Main Street'
+}
+📅 Creating calendar event: {
+  title: 'Community Center Blood Drive - Dheeraj Tallapragada',
+  description: 'Blood donation appointment for Dheeraj Tallapragada at Community Center Blood Drive',
+  startTime: 2025-09-20T13:00:00.000Z,
+  endTime: 2025-09-20T19:00:00.000Z,
+  attendees: [ 'Dheeraj Tallapragada <tsaidheeraj@gmail.com>' ],
+  location: 'Downtown Community Center, 123 Main Street',
+  status: 'confirmed'
+}
+✅ Calendar event data prepared for storage
+✅ Booking saved to local file: booking-1757854966276-g0xpcmsso
+📊 Total bookings: 8
+📤 Sending direct reply via AgentMail: {
+  to: 'Dheeraj Tallapragada <tsaidheeraj@gmail.com>',
+  subject: 'Re: Join Us for unc!',
+  threadId: '111d5d80-e920-42ed-af2b-bc915ab4fd31'
+}
+✅ Direct reply sent successfully: undefined
+   📤 Reply sent successfully!
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 1 unprocessed external messages
+
+📧 Processing: Anish Neema <anishneema0@gmail.com>
+   Subject: Re: Join Us for unc!
+   Message ID: <CAMG9XpTC-268bf_gwM3tRxy3XmS5=fLnWHt-BGHb-a+Dhquzbw@mail.gmail.com>
+   Content: I am not available for this event, but can i get more information?
+
+On Sun, Sep 14, 2025 at 9:02 AM ...
+   🤖 Processing with Claude AI...
+   ✅ Reply generated: information (confidence: 0.9)
+   📝 Reply content: Thank you for your interest in our upcoming blood drive event. Unfortunately, you mentioned that you are not available to attend. However, I'm happy to provide you with more details about the event in case your schedule changes or you'd like to share the information with others who may be interested.  
+
+The University Campus Blood Drive is taking place on September 25, 2025 from 10:00 AM to 4:00 PM at the University Student Center, 456 College Ave. We currently have 45 out of 60 total spots available. To participate, donors must be at least 17 years old, weigh a minimum of 110 lbs, and bring a valid photo ID. We recommend that you eat a good meal, drink plenty of water, and bring a friend for support before your donation. 
+
+If you have any other questions, please don't hesitate to let me know. I'm here to provide any additional information you may need.
+📤 Sending direct reply via AgentMail: {
+  to: 'Anish Neema <anishneema0@gmail.com>',
+  subject: 'Re: Join Us for unc!',
+  threadId: '86a510e0-2b63-4249-913c-352a2d4804e7'
+}
+✅ Direct reply sent successfully: undefined
+   📤 Reply sent successfully!
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process
+🔍 Checking for new unresponded emails...
+📬 Found 50 total messages
+📧 Found 0 unprocessed external messages
+✅ No new emails to process

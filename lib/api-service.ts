@@ -168,14 +168,14 @@ class APIService {
 
   // Bookings API
   async getBookings(): Promise<APIBooking[]> {
-    const response = await fetch(`${this.baseURL}/bookings`)
+    const response = await fetch(`${this.baseURL}/dashboard/booking`)
     const data = await response.json()
 
     if (!response.ok) {
       throw new Error(data.error || 'Failed to fetch bookings')
     }
 
-    return data.bookings
+    return data.bookings || []
   }
 
   async createBooking(bookingData: Partial<APIBooking>): Promise<APIBooking> {
