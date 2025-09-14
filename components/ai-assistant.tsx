@@ -8,13 +8,22 @@ import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { Bot, User, Send, Upload, Calendar, MapPin, Mail, Users, CheckCircle, Clock, AlertCircle } from "lucide-react"
 
+interface UploadedFile {
+  name: string
+  size: number
+  type: string
+  content?: string
+  preview?: any[]
+}
+
 interface Message {
   id: string
   type: "user" | "assistant"
   content: string
   timestamp: Date
+  uploadedFile?: UploadedFile
   actions?: Array<{
-    type: "venue_search" | "email_campaign" | "event_created" | "csv_processed"
+    type: "venue_search" | "email_campaign" | "event_created" | "csv_processed" | "file_uploaded"
     status: "pending" | "completed" | "failed"
     details: string
   }>
@@ -26,12 +35,14 @@ export function AIAssistant() {
       id: "1",
       type: "assistant",
       content:
-        "Hello! I'm your intelligent Blood Drive AI Assistant. I have access to real-time dashboard data and can help you with:\n\n• Answering questions about events, volunteers, and analytics\n• Creating new blood drive events\n• Processing CSV uploads for donor outreach\n• Providing insights and recommendations\n\nTry asking: \"How many volunteers do we have on Thursday September 14th?\" or \"What's our email response rate for the community center drive?\"",
+        "Hello! I'm your intelligent Blood Drive AI Assistant. I have access to real-time dashboard data and can help you with:\n\n• Answering questions about events, volunteers, and analytics\n• Creating new blood drive events\n• Processing CSV uploads for donor outreach\n• Providing insights and recommendations\n\nYou can upload CSV files and add your message in the same input - just like ChatGPT! Try asking: \"How many volunteers do we have on Thursday September 14th?\" or attach a CSV file with instructions.",
       timestamp: new Date(),
     },
   ])
   const [inputValue, setInputValue] = useState("")
   const [isTyping, setIsTyping] = useState(false)
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
+  const [attachedFiles, setAttachedFiles] = useState<UploadedFile[]>([]) // Files ready to send with next message
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -46,35 +57,127 @@ export function AIAssistant() {
   }, [messages])
 
   const handleSendMessage = async () => {
-    if (!inputValue.trim()) return
+    if (!inputValue.trim() && attachedFiles.length === 0) return
 
     const userMessage: Message = {
       id: Date.now().toString(),
       type: "user",
-      content: inputValue,
+      content: inputValue || "📎 File attached",
       timestamp: new Date(),
+      uploadedFile: attachedFiles[0], // For now, support one file per message like ChatGPT
+      actions: attachedFiles.length > 0 ? [{ type: "file_uploaded", status: "completed", details: `Attached ${attachedFiles[0]?.name} (${(attachedFiles[0]?.size / 1024).toFixed(1)} KB)` }] : []
     }
 
     setMessages((prev) => [...prev, userMessage])
+
+    // Move attached files to uploaded files and clear attachments
+    setUploadedFiles(prev => [...prev, ...attachedFiles])
+    const currentAttachedFiles = [...attachedFiles]
+    setAttachedFiles([])
+
+    const currentInput = inputValue
     setInputValue("")
     setIsTyping(true)
 
-    // Simulate AI response with actions
+    // Check if user wants to process CSV files
+    const lowerInput = currentInput.toLowerCase()
+    const hasAttachedCSV = currentAttachedFiles.length > 0 && currentAttachedFiles.some(f => f.name.toLowerCase().endsWith('.csv'))
+    const shouldProcessEmails = (hasAttachedCSV || uploadedFiles.length > 0) &&
+      (lowerInput.includes("send") || lowerInput.includes("process") || lowerInput.includes("email campaign") || lowerInput.includes("create campaign"))
+
+    if (shouldProcessEmails) {
+      const csvFile = currentAttachedFiles.find(f => f.name.toLowerCase().endsWith('.csv')) ||
+                     uploadedFiles.find(f => f.name.toLowerCase().endsWith('.csv'))
+      if (csvFile && csvFile.content) {
+        try {
+          // Call the real API to process the CSV
+          const response = await fetch('/api/csv/process', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              csvContent: csvFile.content,
+              fileName: csvFile.name,
+              campaignName: `Blood Drive Campaign - ${new Date().toLocaleDateString()}`
+            })
+          })
+
+          const result = await response.json()
+
+          const assistantMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            type: "assistant",
+            content: result.success
+              ? `🎉 Email campaign launched successfully!\n\n📊 Campaign Results:\n• Contacts processed: ${result.campaign.contactsProcessed}\n• Emails sent: ${result.campaign.emailsSent}\n• Campaign ID: ${result.campaign.id}\n\nI've sent personalized blood drive invitations to all contacts. The emails include event details, what to expect, and a simple way for recipients to RSVP by replying "YES".\n\n📈 You can now monitor responses in the dashboard as they come in. The AgentMail conversation system will automatically handle replies and track RSVPs.`
+              : `❌ Something went wrong processing your CSV file: ${result.error}. Please try again or check the file format.`,
+            timestamp: new Date(),
+            actions: result.success ? [
+              { type: "csv_processed", status: "completed", details: `Processed ${result.campaign.contactsProcessed} contacts from ${csvFile.name}` },
+              { type: "email_campaign", status: "completed", details: `Sent ${result.campaign.emailsSent} personalized invitations` }
+            ] : []
+          }
+          setMessages((prev) => [...prev, assistantMessage])
+
+        } catch (error) {
+          console.error('Error processing CSV:', error)
+          const errorMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            type: "assistant",
+            content: `❌ I encountered an error while processing your request: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
+            timestamp: new Date(),
+          }
+          setMessages((prev) => [...prev, errorMessage])
+        }
+        setIsTyping(false)
+        return
+      }
+    }
+
+    // Regular AI response simulation
     setTimeout(() => {
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: "assistant",
-        content: getAIResponse(inputValue),
+        content: getAIResponse(currentInput, currentAttachedFiles[0]),
         timestamp: new Date(),
-        actions: getAIActions(inputValue),
+        actions: getAIActions(currentInput),
       }
       setMessages((prev) => [...prev, assistantMessage])
       setIsTyping(false)
     }, 2000)
   }
 
-  const getAIResponse = (input: string): string => {
+  const getAIResponse = (input: string, messageWithFile?: UploadedFile): string => {
     const lowerInput = input.toLowerCase()
+    const hasUploadedFiles = uploadedFiles.length > 0
+    const csvFile = messageWithFile || uploadedFiles.find(f => f.name.toLowerCase().endsWith('.csv'))
+
+    // File was just attached with this message
+    if (messageWithFile && messageWithFile.name.toLowerCase().endsWith('.csv')) {
+      const contacts = messageWithFile.preview?.slice(1) || [] // Skip header row
+      const headers = messageWithFile.preview?.[0] || []
+
+      // If user also provided instructions with the file
+      if (input.trim()) {
+        return `Perfect! I can see you've attached "${messageWithFile.name}" and want me to help with: "${input}"\n\n📊 File Analysis:\n• File: ${messageWithFile.name}\n• Size: ${(messageWithFile.size / 1024).toFixed(1)} KB\n• Headers: ${headers.join(', ')}\n• Total contacts: ${contacts.length}\n\n📋 Sample data:\n${contacts.slice(0, 3).map((row: any[], idx: number) => `${idx + 1}. ${row.join(' | ')}`).join('\n')}\n\nBased on your request, I can help you with that! What specific action would you like me to take with this data?`
+      } else {
+        return `Great! I've received your CSV file "${messageWithFile.name}". Let me analyze it:\n\n📊 File Details:\n• Size: ${(messageWithFile.size / 1024).toFixed(1)} KB\n• Headers: ${headers.join(', ')}\n• Total contacts: ${contacts.length}\n\n📋 Sample data:\n${contacts.slice(0, 3).map((row: any[], idx: number) => `${idx + 1}. ${row.join(' | ')}`).join('\n')}\n\nWhat would you like me to do with this data? I can:\n• Create and send email campaigns\n• Analyze contact demographics\n• Validate email addresses\n• Filter and export contacts\n\nJust let me know what you'd like to accomplish!`
+      }
+    }
+
+    // File-related queries for existing files
+    if (hasUploadedFiles && (lowerInput.includes("process") || lowerInput.includes("send") || lowerInput.includes("email campaign"))) {
+      if (csvFile) {
+        return `I can help you process ${csvFile.name} and create an email campaign! Here's what I found:\n\n📊 File Analysis:\n• File: ${csvFile.name}\n• Size: ${(csvFile.size / 1024).toFixed(1)} KB\n• Estimated contacts: ${csvFile.preview ? csvFile.preview.length - 1 : 'analyzing...'}\n\n🎯 What I can do:\n• Send personalized blood drive invitations\n• Schedule follow-up reminders\n• Track responses and RSVPs\n• Generate campaign analytics\n\nWould you like me to proceed with sending the email campaign? Just say "send the email campaign" and I'll start the process.`
+      }
+    }
+
+    if (hasUploadedFiles && (lowerInput.includes("file") || lowerInput.includes("csv") || lowerInput.includes("data") || lowerInput.includes("contacts"))) {
+      if (csvFile && csvFile.preview) {
+        const contacts = csvFile.preview.slice(1) // Skip header row
+        const headers = csvFile.preview[0] || []
+        return `Let me analyze your CSV file "${csvFile.name}":\n\n📋 File Structure:\n• Headers: ${headers.join(', ')}\n• Total contacts: ${contacts.length}\n• File size: ${(csvFile.size / 1024).toFixed(1)} KB\n\n📊 Sample data preview:\n${contacts.slice(0, 3).map((row: any[], idx: number) => `${idx + 1}. ${row[0]} - ${row[1] || row[2] || 'N/A'}`).join('\n')}\n\nWhat would you like me to do with this data? I can:\n• Create and send an email campaign\n• Analyze the contact demographics\n• Validate email addresses\n• Export filtered contacts`
+      }
+    }
 
     // Dashboard data queries
     if (lowerInput.includes("how many") && (lowerInput.includes("volunteer") || lowerInput.includes("people")) && lowerInput.includes("thursday") && lowerInput.includes("sept")) {
@@ -98,26 +201,31 @@ export function AIAssistant() {
     }
 
     if (lowerInput.includes("email") || lowerInput.includes("outreach") || lowerInput.includes("donors")) {
-      return "Perfect! I'll set up the donor outreach campaign. Please upload your CSV file with donor contacts, and I'll automatically send personalized invitations, schedule follow-up reminders, and track RSVPs."
+      return "Perfect! I'll set up the donor outreach campaign. Please upload your CSV file with donor contacts, and I'll help you analyze the data before sending personalized invitations."
     }
 
-    return "I understand. Let me help you with that. I can provide insights on event performance, volunteer schedules, donor engagement metrics, or help you create new blood drives. What would you like to know?"
+    return "I understand. Let me help you with that. I can provide insights on event performance, volunteer schedules, donor engagement metrics, or help you create new blood drives. You can also upload CSV files and I'll help you analyze and process them. What would you like to know?"
   }
 
   const getAIActions = (input: string): Message["actions"] => {
     const lowerInput = input.toLowerCase()
+    const hasUploadedFiles = uploadedFiles.length > 0
+
+    // Only process email campaigns when explicitly requested
+    if (hasUploadedFiles && (lowerInput.includes("yes") || lowerInput.includes("send") || lowerInput.includes("process")) && lowerInput.includes("email")) {
+      const csvFile = uploadedFiles.find(f => f.name.toLowerCase().endsWith('.csv'))
+      if (csvFile) {
+        return [
+          { type: "csv_processed", status: "completed", details: `Processed ${csvFile.preview?.length - 1 || 0} donor contacts from ${csvFile.name}` },
+          { type: "email_campaign", status: "pending", details: "Sending personalized invitations" },
+        ]
+      }
+    }
 
     if (lowerInput.includes("venue") || lowerInput.includes("location")) {
       return [
         { type: "venue_search", status: "pending", details: "Searching 15 venues within 10 miles" },
         { type: "venue_search", status: "completed", details: "Found 8 suitable venues, sending booking requests" },
-      ]
-    }
-
-    if (lowerInput.includes("email") || lowerInput.includes("csv")) {
-      return [
-        { type: "csv_processed", status: "completed", details: "Processed 247 donor contacts" },
-        { type: "email_campaign", status: "pending", details: "Sending personalized invitations" },
       ]
     }
 
@@ -128,35 +236,40 @@ export function AIAssistant() {
     return []
   }
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (file && file.name.endsWith(".csv")) {
-      const message: Message = {
-        id: Date.now().toString(),
-        type: "user",
-        content: `Uploaded CSV file: ${file.name}`,
-        timestamp: new Date(),
-      }
-      setMessages((prev) => [...prev, message])
+    if (!file) return
 
-      // Simulate processing
-      setTimeout(() => {
-        const response: Message = {
-          id: (Date.now() + 1).toString(),
-          type: "assistant",
-          content: `Perfect! I've processed your CSV file with ${Math.floor(Math.random() * 300 + 100)} donor contacts. I'm now sending personalized invitations and will track all responses. You can monitor the progress in the dashboard.`,
-          timestamp: new Date(),
-          actions: [
-            {
-              type: "csv_processed",
-              status: "completed",
-              details: `Processed ${Math.floor(Math.random() * 300 + 100)} contacts`,
-            },
-            { type: "email_campaign", status: "pending", details: "Sending personalized invitations" },
-          ],
+    if (file.name.toLowerCase().endsWith(".csv")) {
+      try {
+        // Read file content for preview
+        const content = await file.text()
+        const lines = content.split('\n').filter(line => line.trim())
+        const preview = lines.slice(0, 10).map(line => line.split(',').map(cell => cell.trim())) // First 10 rows as preview
+
+        const uploadedFile: UploadedFile = {
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          content: content,
+          preview: preview
         }
-        setMessages((prev) => [...prev, response])
-      }, 1500)
+
+        // Add to attached files (ready to send with next message)
+        setAttachedFiles(prev => [...prev, uploadedFile])
+
+      } catch (error) {
+        console.error('Error reading CSV file:', error)
+        alert(`Error reading CSV file: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      }
+    } else {
+      // Handle non-CSV files
+      alert(`I can only process CSV files for now. The file "${file.name}" doesn't appear to be a CSV file. Please upload a .csv file with your donor contacts.`)
+    }
+
+    // Clear the input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
     }
   }
 
@@ -170,6 +283,8 @@ export function AIAssistant() {
         return <Calendar className="h-4 w-4" />
       case "csv_processed":
         return <Users className="h-4 w-4" />
+      case "file_uploaded":
+        return <Upload className="h-4 w-4" />
       default:
         return <CheckCircle className="h-4 w-4" />
     }
@@ -211,6 +326,34 @@ export function AIAssistant() {
               >
                 <p className="whitespace-pre-wrap">{message.content}</p>
               </div>
+
+              {/* File Preview */}
+              {message.uploadedFile && (
+                <div className="mt-2 p-3 border rounded-lg bg-card">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Upload className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">{message.uploadedFile.name}</span>
+                    <span className="text-xs text-muted-foreground">({(message.uploadedFile.size / 1024).toFixed(1)} KB)</span>
+                  </div>
+
+                  {message.uploadedFile.preview && message.uploadedFile.preview.length > 0 && (
+                    <div className="text-xs">
+                      <div className="font-medium mb-1">Preview:</div>
+                      <div className="bg-muted p-2 rounded text-xs font-mono max-h-32 overflow-y-auto">
+                        {/* Headers */}
+                        <div className="font-bold text-primary">{message.uploadedFile.preview[0]?.join(' | ')}</div>
+                        {/* First few data rows */}
+                        {message.uploadedFile.preview.slice(1, 5).map((row, idx) => (
+                          <div key={idx} className="text-muted-foreground">{row.join(' | ')}</div>
+                        ))}
+                        {message.uploadedFile.preview.length > 5 && (
+                          <div className="text-muted-foreground italic">... and {message.uploadedFile.preview.length - 5} more rows</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* AI Actions */}
               {message.actions && message.actions.length > 0 && (
@@ -262,6 +405,27 @@ export function AIAssistant() {
 
       {/* Input Area */}
       <div className="p-4">
+        {/* Attached Files Preview */}
+        {attachedFiles.length > 0 && (
+          <div className="mb-3 space-y-2">
+            {attachedFiles.map((file, index) => (
+              <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded-lg text-sm">
+                <Upload className="h-4 w-4 text-muted-foreground" />
+                <span className="flex-1 font-medium">{file.name}</span>
+                <span className="text-xs text-muted-foreground">({(file.size / 1024).toFixed(1)} KB)</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setAttachedFiles(prev => prev.filter((_, i) => i !== index))}
+                  className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                >
+                  ×
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="flex gap-2">
           <Button variant="outline" size="icon" onClick={() => fileInputRef.current?.click()} className="flex-shrink-0">
             <Upload className="h-4 w-4" />
@@ -269,17 +433,23 @@ export function AIAssistant() {
           <Input
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Type your message... (e.g., 'Create a new blood drive for next Saturday')"
+            placeholder={attachedFiles.length > 0
+              ? "Add a message with your file..."
+              : "Type your message... (e.g., 'Create a new blood drive for next Saturday')"
+            }
             onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
             className="flex-1"
           />
-          <Button onClick={handleSendMessage} disabled={!inputValue.trim() || isTyping}>
+          <Button onClick={handleSendMessage} disabled={(!inputValue.trim() && attachedFiles.length === 0) || isTyping}>
             <Send className="h-4 w-4" />
           </Button>
         </div>
         <input ref={fileInputRef} type="file" accept=".csv" onChange={handleFileUpload} className="hidden" />
         <p className="text-xs text-muted-foreground mt-2">
-          Upload CSV files with donor contacts or describe what you'd like to set up
+          {attachedFiles.length > 0
+            ? "File attached - add your message and press send"
+            : "Upload CSV files with donor contacts or describe what you'd like to set up"
+          }
         </p>
       </div>
     </div>

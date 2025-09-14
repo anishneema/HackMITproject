@@ -12,9 +12,12 @@ import { CSVReader } from "@/lib/email-automation/csv-reader"
 import { agentMailService } from "@/lib/agent-mail-service"
 import { Bot, User, Send, Upload, Calendar, MapPin, Mail, Users, CheckCircle, Clock, AlertCircle, BarChart } from "lucide-react"
 import { ChatSidebar } from "./chat-sidebar"
+import { CSVTableVisualization } from "./csv-table-visualization"
+// import "@/lib/sample-data" // Initialize sample data - temporarily disabled for debugging
 
 export function SmartAIAssistant() {
   const [inputValue, setInputValue] = useState("")
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([])
   const {
     sessions,
     activeSessionId,
@@ -35,7 +38,7 @@ export function SmartAIAssistant() {
 
   // Get dashboard data
   const dashboardStore = useDashboardStore()
-  const { events, campaigns, bookings, getDashboardTotals, addEvent, onEmailSent, createEventAPI, createActivity } = dashboardStore
+  const { events, campaigns, bookings, getDashboardTotals, addEvent, onEmailSent } = dashboardStore
 
   // Create initial session if none exists
   useEffect(() => {
@@ -56,16 +59,29 @@ export function SmartAIAssistant() {
   }, [activeSession?.messages])
 
   const handleSendMessage = async () => {
-    if (!inputValue.trim() || !activeSessionId) return
+    if ((!inputValue.trim() && attachedFiles.length === 0) || !activeSessionId) return
+
+    // Create user message content
+    let messageContent = inputValue.trim()
+    if (attachedFiles.length > 0) {
+      const fileNames = attachedFiles.map(file => file.name).join(", ")
+      if (messageContent) {
+        messageContent += `\n\n[Attached files: ${fileNames}]`
+      } else {
+        messageContent = `[Attached files: ${fileNames}]`
+      }
+    }
 
     // Add user message
     addMessage(activeSessionId, {
       type: "user",
-      content: inputValue,
+      content: messageContent,
     })
 
     const currentInput = inputValue
+    const currentFiles = [...attachedFiles]
     setInputValue("")
+    setAttachedFiles([])
     setProcessing(activeSessionId, true)
 
     try {
@@ -76,7 +92,82 @@ export function SmartAIAssistant() {
         timestamp: msg.timestamp
       })) || []
 
-      const aiResponse: AIResponse = await queryDashboardData(currentInput, conversationHistory)
+      let aiResponse: AIResponse
+
+      // Check if we have CSV files to process
+      const csvFiles = currentFiles.filter(file => file.name.endsWith('.csv'))
+      
+      if (csvFiles.length > 0) {
+        // Check if user is asking about the CSV content (not requesting email sending)
+        const lowerInput = currentInput.toLowerCase()
+        const isAskingAboutContent = lowerInput.includes('what') || 
+                                   lowerInput.includes('tell me') || 
+                                   lowerInput.includes('show me') || 
+                                   lowerInput.includes('analyze') || 
+                                   lowerInput.includes('explain') ||
+                                   lowerInput.includes('include') ||
+                                   lowerInput.includes('content') ||
+                                   lowerInput.includes('data') ||
+                                   lowerInput.includes('look at') ||
+                                   lowerInput.includes('check') ||
+                                   lowerInput.includes('review')
+        
+        const isRequestingEmailSending = lowerInput.includes('send') || 
+                                       lowerInput.includes('email') || 
+                                       lowerInput.includes('campaign') || 
+                                       lowerInput.includes('outreach') ||
+                                       lowerInput.includes('invite') ||
+                                       lowerInput.includes('notify')
+        
+        if (isAskingAboutContent && !isRequestingEmailSending) {
+          // User wants to know about the CSV content, not send emails
+          aiResponse = await analyzeCSVContent(csvFiles, currentInput, conversationHistory)
+        } else if (isRequestingEmailSending || currentInput.trim() === '') {
+          // User wants to send emails with the CSV (or no specific instruction = default to sending)
+          aiResponse = await handleCSVFilesWithContext(csvFiles, currentInput, conversationHistory)
+        } else {
+          // Default to analysis if unclear
+          aiResponse = await analyzeCSVContent(csvFiles, currentInput, conversationHistory)
+        }
+      } else {
+        // Check if user is referring to CSV data from conversation history
+        const lowerInput = currentInput.toLowerCase()
+        const hasCSVInHistory = conversationHistory.some((msg: any) => 
+          msg.type === 'assistant' && msg.csvData
+        )
+        
+        if (hasCSVInHistory && (lowerInput.includes('send') || lowerInput.includes('email') || lowerInput.includes('campaign'))) {
+          // User is referring to CSV data from previous message
+          const lastCSVMessage = conversationHistory
+            .filter((msg: any) => msg.type === 'assistant' && msg.csvData)
+            .pop()
+          
+          if ((lastCSVMessage as any)?.csvData) {
+            // Reconstruct CSV data from the conversation history
+            const contacts = (lastCSVMessage as any).csvData.contacts
+            const fileName = (lastCSVMessage as any).csvData.fileName
+            
+            // Create a proper CSV string from the contacts
+            const headers = Object.keys(contacts[0] || {})
+            const csvContent = [
+              headers.join(','),
+              ...contacts.map((contact: any) => 
+                headers.map(header => contact[header] || '').join(',')
+              )
+            ].join('\n')
+            
+            const csvBlob = new Blob([csvContent], { type: 'text/csv' })
+            const csvFile = new File([csvBlob], fileName, { type: 'text/csv' })
+            
+            aiResponse = await handleCSVFilesWithContext([csvFile], currentInput, conversationHistory)
+          } else {
+            aiResponse = await queryDashboardData(currentInput, conversationHistory)
+          }
+        } else {
+          // Regular text processing
+          aiResponse = await queryDashboardData(currentInput, conversationHistory)
+        }
+      }
 
       // Handle any automation triggers
       await handleAutomationTriggers(currentInput, aiResponse)
@@ -86,6 +177,7 @@ export function SmartAIAssistant() {
         type: "assistant",
         content: aiResponse.content,
         actions: aiResponse.actions,
+        csvData: aiResponse.csvData,
       })
     } catch (error) {
       console.error("Error getting AI response:", error)
@@ -165,7 +257,7 @@ export function SmartAIAssistant() {
         emailsReplied: 0
       })
 
-      const newEventId = await createEventAPI({
+      const newEventId = addEvent({
         name: eventName,
         date: eventDate,
         time: eventTime,
@@ -180,15 +272,6 @@ export function SmartAIAssistant() {
 
       console.log("Created event with ID:", newEventId)
       console.log("Total events after creation:", events.length)
-
-      // Log AI activity
-      await createActivity({
-        action: "Blood Drive Event Created",
-        details: `Created "${eventName}" at ${venue} for ${eventDate} targeting ${targetDonors} donors`,
-        status: "completed",
-        type: "ai_response",
-        eventId: newEventId
-      })
 
       // Update the AI response actions to show completion
       if (aiResponse.actions) {
@@ -226,34 +309,109 @@ export function SmartAIAssistant() {
     }
   }
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('File Upload Debug: handleFileUpload called')
-    const file = event.target.files?.[0]
-    console.log('File Upload Debug: file object:', file)
-    console.log('File Upload Debug: activeSessionId:', activeSessionId)
-
-    if (!file || !file.name.endsWith(".csv") || !activeSessionId) {
-      console.log('File Upload Debug: Early return - file check failed')
-      return
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || [])
+    const csvFiles = files.filter(file => file.name.endsWith('.csv'))
+    
+    if (csvFiles.length > 0) {
+      setAttachedFiles(prev => [...prev, ...csvFiles])
     }
+    
+    // Clear the input so the same file can be selected again if needed
+    event.target.value = ''
+  }
 
-    console.log('File Upload Debug: Starting file processing for:', file.name)
+  const removeAttachedFile = (index: number) => {
+    setAttachedFiles(prev => prev.filter((_, i) => i !== index))
+  }
 
-    // Add user message for file upload
-    addMessage(activeSessionId, {
-      type: "user",
-      content: `Uploaded CSV file: ${file.name}`,
-    })
-
-    setProcessing(activeSessionId, true)
-
+  const analyzeCSVContent = async (csvFiles: File[], userQuestion: string, conversationHistory: any[]): Promise<AIResponse> => {
+    console.log('Analyzing CSV content for user question:', userQuestion)
+    
+    // Process the first CSV file
+    const file = csvFiles[0]
+    
     try {
-      console.log('File Upload Debug: Calling claudeAI.handleCSVUpload')
-      // Process with Claude AI first for validation
-      const aiResponse = await claudeAI.handleCSVUpload(file)
+      // Parse the CSV to understand its content
+      const contacts = await CSVReader.parseCSVFile(file)
+      console.log('Parsed contacts for analysis:', contacts)
+      
+      if (contacts.length === 0) {
+        return {
+          content: `I found the CSV file "${file.name}" but couldn't extract any valid contact information from it. The file might be empty or not in the expected format.`,
+          actions: [{
+            type: "data_query",
+            status: "failed",
+            details: "No valid contacts found in CSV"
+          }]
+        }
+      }
+      
+      // Analyze the CSV content
+      const totalContacts = contacts.length
+      const emailCount = contacts.filter(c => c.email).length
+      const nameCount = contacts.filter(c => c.firstName || c.lastName).length
+      
+      // Get sample data for analysis
+      const sampleContacts = contacts.slice(0, 3)
+      const sampleData = sampleContacts.map(contact => ({
+        email: contact.email,
+        name: contact.firstName && contact.lastName ? `${contact.firstName} ${contact.lastName}` : contact.firstName || contact.lastName || 'No name provided',
+        organization: contact.organization || 'No organization provided'
+      }))
+      
+      // Create a detailed analysis response
+      let analysisContent = `📊 **CSV File Analysis: "${file.name}"**\n\n`
+      
+      analysisContent += `**File Overview:**\n`
+      analysisContent += `• Total rows: ${totalContacts}\n`
+      analysisContent += `• Valid email addresses: ${emailCount}\n`
+      analysisContent += `• Contacts with names: ${nameCount}\n\n`
+      
+      analysisContent += `**What you can do with this data:**\n`
+      analysisContent += `• 📧 Send personalized email campaigns\n`
+      analysisContent += `• 📊 Track engagement and responses\n`
+      analysisContent += `• 🎯 Target specific groups for events\n`
+      analysisContent += `• 📱 Follow up with phone calls if needed\n\n`
+      
+      analysisContent += `**Ready to send emails?** Just ask me to "send emails to these contacts" or "create a campaign" and I'll help you set up personalized outreach!`
+      
+      return {
+        content: analysisContent,
+        actions: [{
+          type: "data_query",
+          status: "completed",
+          details: `Analyzed ${totalContacts} contacts from CSV file`
+        }],
+        // Add CSV data for table visualization
+        csvData: {
+          contacts,
+          fileName: file.name
+        }
+      }
+      
+    } catch (error) {
+      console.error('Error analyzing CSV file:', error)
+      return {
+        content: `I encountered an error analyzing your CSV file: ${error instanceof Error ? error.message : 'Unknown error'}. Please check that your file has proper email addresses and at least one name column.`,
+        actions: [{
+          type: "data_query",
+          status: "failed",
+          details: "Error analyzing CSV file"
+        }]
+      }
+    }
+  }
 
-      // If AI validation passed, process CSV
-      console.log('File Upload Debug: AI validation passed, processing CSV')
+  const handleCSVFilesWithContext = async (csvFiles: File[], context: string, conversationHistory: any[]): Promise<AIResponse> => {
+    console.log('Processing CSV files with context:', csvFiles.map(f => f.name), 'Context:', context)
+    
+    // Process the first CSV file (we'll handle multiple files later if needed)
+    const file = csvFiles[0]
+    
+    try {
+      // Process CSV data first
+      console.log('Processing CSV data')
       const contacts = await CSVReader.parseCSVFile(file)
       console.log('Processed contacts:', contacts)
 
@@ -261,10 +419,35 @@ export function SmartAIAssistant() {
         throw new Error('No valid contacts found in the CSV file. Please check that your file has proper email addresses and at least one name column.')
       }
 
+      // Create a proper AI response with actual CSV data
+      const aiResponse: AIResponse = {
+        content: `✅ CSV file "${file.name}" uploaded successfully!
+
+I found ${contacts.length} contacts in your file. I'm now processing the email addresses and preparing to send personalized emails through AgentMail.
+
+**What I'm doing:**
+1. 📧 Extracting email addresses, first names, and last names
+2. 🤖 Setting up AgentMail campaign
+3. 📨 Preparing personalized email templates
+4. 🚀 Starting the email campaign
+
+Your contacts will receive personalized emails about the upcoming blood drive event!`,
+        actions: [{
+          type: 'csv_processed',
+          status: 'completed',
+          details: `Successfully processed ${contacts.length} contacts from ${file.name}`
+        }],
+        // Add CSV data for table visualization
+        csvData: {
+          contacts,
+          fileName: file.name
+        }
+      }
+
       // Create a sample event for the campaign if none exists
       let eventId = events.length > 0 ? events[0].id : null
       if (!eventId) {
-        eventId = await createEventAPI({
+        eventId = addEvent({
           name: "Blood Drive Campaign",
           date: "This Saturday",
           time: "9:00 AM",
@@ -284,9 +467,36 @@ export function SmartAIAssistant() {
       try {
         console.log('Sending emails via AgentMail API...')
         
-        const emailTemplate = {
+        // Use context to customize the email template if provided
+        let emailTemplate = {
           subject: "Join Us for a Life-Saving Blood Drive!",
           body: `Hello {{firstName}},
+
+We hope this message finds you well. We're reaching out to invite you to participate in our upcoming blood drive.
+
+Your support has always been invaluable to our mission, and we would be honored to have you join us for this important initiative.
+
+Our next event details:
+- Date: This Saturday
+- Time: 9:00 AM - 3:00 PM
+- Location: Community Center
+- Duration: Typically 3-4 hours
+
+Your contribution can make a real difference in saving lives. One blood donation can help save up to three lives!
+
+Please reply to this email if you're interested in participating, and we'll send you the specific details once they're confirmed.
+
+Thank you for considering this opportunity to help others.
+
+Best regards,
+Red Cross Events Team`
+        }
+
+        // If user provided context, try to incorporate it into the email
+        if (context.trim()) {
+          emailTemplate.body = `Hello {{firstName}},
+
+${context}
 
 We hope this message finds you well. We're reaching out to invite you to participate in our upcoming blood drive.
 
@@ -323,17 +533,8 @@ Red Cross Events Team`
 
         if (emailResponse.ok) {
           const result = await emailResponse.json()
-          console.log('Emails sent successfully via SMTP:', result)
-
-          // Log AI activity for email campaign
-          await createActivity({
-            action: "Email Campaign Launched",
-            details: `Sent ${result.details?.sent || contacts.length} personalized invitations to blood drive`,
-            status: result.success ? "completed" : "active",
-            type: "email",
-            eventId
-          })
-
+          console.log('Emails sent successfully via AgentMail:', result)
+          
           // Update the AI response to include email sending success
           const successMessage = result.success 
             ? `📧 I've sent personalized emails to all ${contacts.length} contacts! They will receive invitations to our blood drive event in their inbox.`
@@ -349,55 +550,29 @@ Red Cross Events Team`
           }
         } else {
           const errorData = await emailResponse.json()
-          console.error('Failed to send emails via SMTP:', errorData)
+          console.error('Failed to send emails via AgentMail:', errorData)
           
           // Update the AI response to include email sending failure
           aiResponse.content += `\n\n⚠️ **Email Sending Issue**\nI processed your CSV file successfully, but encountered an issue sending emails. ${errorData.details || 'Please check your email configuration.'}`
         }
       } catch (error) {
-        console.error('Error sending emails via SMTP:', error)
+        console.error('Error sending emails via AgentMail:', error)
         
         // Update the AI response to include email sending error
         aiResponse.content += `\n\n⚠️ **Email Sending Error**\nI processed your CSV file successfully, but encountered an error sending emails. Please try again or check your email configuration.`
       }
 
-      // Add assistant response
-      addMessage(activeSessionId, {
-        type: "assistant",
-        content: aiResponse.content,
-        actions: aiResponse.actions,
-      })
-
+      return aiResponse
     } catch (error) {
-      console.error('Error processing CSV:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
-      
-      addMessage(activeSessionId, {
-        type: "assistant",
-        content: `❌ I encountered an error processing your CSV file: ${errorMessage}
-
-**Common CSV format requirements:**
-• Must have an 'email' column (required)
-• Should have at least one name column (like 'name', 'firstName', 'lastName', etc.)
-• Use comma (,) or semicolon (;) as separators
-• Make sure email addresses are valid
-
-**Example CSV format:**
-\`\`\`
-email,name,phone
-john@example.com,John Doe,555-1234
-jane@example.com,Jane Smith,555-5678
-\`\`\`
-
-Please check your file format and try uploading again.`,
+      console.error('Error processing CSV file:', error)
+      return {
+        content: `I encountered an error processing your CSV file: ${error instanceof Error ? error.message : 'Unknown error'}. Please check that your file has proper email addresses and at least one name column.`,
         actions: [{
-          type: "csv_processed",
+          type: "data_query",
           status: "failed",
-          details: errorMessage
+          details: "Error processing CSV file"
         }]
-      })
-    } finally {
-      setProcessing(activeSessionId, false)
+      }
     }
   }
 
@@ -492,7 +667,35 @@ Please check your file format and try uploading again.`,
                         : "bg-muted"
                     }`}
                   >
-                    <p className="whitespace-pre-wrap text-sm">{message.content}</p>
+                    <div className="text-sm prose prose-sm max-w-none">
+                      {message.content.split('\n').map((line, index) => {
+                        // Handle bold text with **
+                        if (line.includes('**')) {
+                          const parts = line.split(/(\*\*.*?\*\*)/g)
+                          return (
+                            <p key={index} className="mb-2">
+                              {parts.map((part, partIndex) => {
+                                if (part.startsWith('**') && part.endsWith('**')) {
+                                  return <strong key={partIndex}>{part.slice(2, -2)}</strong>
+                                }
+                                return part
+                              })}
+                            </p>
+                          )
+                        }
+                        return <p key={index} className="mb-2">{line}</p>
+                      })}
+                    </div>
+                    
+                    {/* CSV Table Visualization */}
+                    {message.csvData && (
+                      <div className="mt-4">
+                        <CSVTableVisualization 
+                          contacts={message.csvData.contacts}
+                          fileName={message.csvData.fileName}
+                        />
+                      </div>
+                    )}
                   </div>
 
                   {/* AI Actions */}
@@ -550,6 +753,33 @@ Please check your file format and try uploading again.`,
 
         {/* Input Area */}
         <div className="p-4 bg-card">
+          {/* Attached Files Display */}
+          {attachedFiles.length > 0 && (
+            <div className="mb-3 p-2 bg-muted rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <Upload className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Attached Files:</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {attachedFiles.map((file, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-2 px-2 py-1 bg-background border rounded-md text-sm"
+                  >
+                    <span className="text-muted-foreground">{file.name}</span>
+                    <button
+                      onClick={() => removeAttachedFile(index)}
+                      className="text-muted-foreground hover:text-foreground"
+                      disabled={isProcessing}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
           <div className="flex gap-2">
             <Button
               variant="outline"
@@ -566,14 +796,14 @@ Please check your file format and try uploading again.`,
             <Input
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder="Ask about your dashboard data or upload a CSV file..."
+              placeholder={attachedFiles.length > 0 ? "Add context for your attached files..." : "Ask about your dashboard data or attach a CSV file..."}
               onKeyPress={(e) => e.key === "Enter" && !isProcessing && handleSendMessage()}
               className="flex-1"
               disabled={isProcessing}
             />
             <Button
               onClick={handleSendMessage}
-              disabled={!inputValue.trim() || isProcessing}
+              disabled={(!inputValue.trim() && attachedFiles.length === 0) || isProcessing}
             >
               <Send className="h-4 w-4" />
             </Button>
@@ -586,7 +816,10 @@ Please check your file format and try uploading again.`,
             className="hidden"
           />
           <p className="text-xs text-muted-foreground mt-2">
-            Upload CSV files for automated donor outreach or ask questions about your dashboard data
+            {attachedFiles.length > 0 
+              ? "Add context for your CSV file or send it as-is for automated donor outreach"
+              : "Upload CSV files for automated donor outreach or ask questions about your dashboard data"
+            }
           </p>
         </div>
       </div>

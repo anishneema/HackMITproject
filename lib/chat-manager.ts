@@ -13,6 +13,10 @@ export interface ChatMessage {
     status: "pending" | "completed" | "failed"
     details: string
   }>
+  csvData?: {
+    contacts: any[]
+    fileName: string
+  }
 }
 
 export interface ChatSession {
