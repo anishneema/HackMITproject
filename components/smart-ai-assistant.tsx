@@ -492,31 +492,8 @@ Best regards,
 Red Cross Events Team`
         }
 
-        // If user provided context, try to incorporate it into the email
-        if (context.trim()) {
-          emailTemplate.body = `Hello {{firstName}},
-
-${context}
-
-We hope this message finds you well. We're reaching out to invite you to participate in our upcoming blood drive.
-
-Your support has always been invaluable to our mission, and we would be honored to have you join us for this important initiative.
-
-Our next event details:
-- Date: This Saturday
-- Time: 9:00 AM - 3:00 PM
-- Location: Community Center
-- Duration: Typically 3-4 hours
-
-Your contribution can make a real difference in saving lives. One blood donation can help save up to three lives!
-
-Please reply to this email if you're interested in participating, and we'll send you the specific details once they're confirmed.
-
-Thank you for considering this opportunity to help others.
-
-Best regards,
-Red Cross Events Team`
-        }
+        // Use the standard email template without including user context
+        // The context is only used for AI processing, not for the actual email content
 
         const emailResponse = await fetch('/api/email/send', {
           method: 'POST',
