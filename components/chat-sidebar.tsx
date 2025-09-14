@@ -5,13 +5,25 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { useChatStore } from "@/lib/chat-manager"
-import { Plus, MessageSquare, Trash2, MoreHorizontal } from "lucide-react"
+import { Plus, MessageSquare, Trash2, MoreHorizontal, Edit3 } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 export function ChatSidebar() {
   const {
@@ -20,7 +32,11 @@ export function ChatSidebar() {
     createSession,
     deleteSession,
     setActiveSession,
+    updateSessionTitle,
   } = useChatStore()
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [sessionToDelete, setSessionToDelete] = useState<string | null>(null)
 
   const handleNewChat = () => {
     const sessionId = createSession()
@@ -33,11 +49,32 @@ export function ChatSidebar() {
 
   const handleDeleteChat = (sessionId: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    deleteSession(sessionId)
+    setSessionToDelete(sessionId)
+    setDeleteDialogOpen(true)
+  }
+
+  const confirmDeleteChat = () => {
+    if (sessionToDelete) {
+      deleteSession(sessionToDelete)
+      setDeleteDialogOpen(false)
+      setSessionToDelete(null)
+    }
+  }
+
+  const handleRenameChat = (sessionId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    const newTitle = prompt("Enter new chat title:")
+    if (newTitle && newTitle.trim()) {
+      updateSessionTitle(sessionId, newTitle.trim())
+    }
+  }
+
+  const getSessionToDelete = () => {
+    return sessions.find(s => s.id === sessionToDelete)
   }
 
   return (
-    <div className="w-64 bg-card border-r border-border flex flex-col h-full">
+    <div className="w-64 bg-card border-r border-border flex flex-col h-full overflow-visible">
       {/* Header */}
       <div className="p-4 border-b border-border">
         <Button
@@ -51,7 +88,7 @@ export function ChatSidebar() {
       </div>
 
       {/* Chat List */}
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 overflow-visible">
         <div className="p-2 space-y-1">
           {sessions.map((session) => (
             <div
@@ -76,28 +113,27 @@ export function ChatSidebar() {
                 </div>
               )}
 
-              {/* Options menu */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <MoreHorizontal className="h-3 w-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    onClick={(e) => handleDeleteChat(session.id, e)}
-                    className="text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete Chat
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {/* Options buttons */}
+              <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 mr-1"
+                  onClick={(e) => handleRenameChat(session.id, e)}
+                  title="Rename chat"
+                >
+                  <Edit3 className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                  onClick={(e) => handleDeleteChat(session.id, e)}
+                  title="Delete chat"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
             </div>
           ))}
 
@@ -115,6 +151,28 @@ export function ChatSidebar() {
           {sessions.length} chat{sessions.length !== 1 ? "s" : ""}
         </p>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Chat</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{getSessionToDelete()?.title}"? This action cannot be undone.
+              All messages in this chat will be permanently deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteChat}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete Chat
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
