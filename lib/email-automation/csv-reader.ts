@@ -89,6 +89,7 @@ export class CSVReader {
         case 'email':
         case 'email address':
         case 'emailaddress':
+        case 'e-mail':
           contact.email = value
           break
         case 'firstname':
@@ -101,10 +102,32 @@ export class CSVReader {
         case 'last_name':
           contact.lastName = value
           break
+        case 'name':
+        case 'full name':
+        case 'fullname':
+        case 'contact name':
+          // Split full name into first and last name
+          if (value) {
+            const nameParts = value.split(' ')
+            contact.firstName = nameParts[0] || ''
+            contact.lastName = nameParts.slice(1).join(' ') || ''
+          }
+          break
         case 'organization':
         case 'company':
         case 'org':
           contact.organization = value
+          break
+        case 'phone':
+        case 'phone number':
+        case 'mobile':
+        case 'cell':
+          customFields['phone'] = value
+          break
+        case 'location':
+        case 'city':
+        case 'address':
+          customFields['location'] = value
           break
         default:
           if (value) {
@@ -113,7 +136,18 @@ export class CSVReader {
       }
     }
 
-    if (!contact.email) return null
+    if (!contact.email) {
+      console.warn('Skipping contact: no email address found')
+      return null
+    }
+
+    // Ensure we have at least some name information
+    if (!contact.firstName && !contact.lastName) {
+      console.warn(`Contact ${contact.email} has no name information`)
+      // You could still include them if you want, or skip them
+      // For now, we'll include them but mark as unknown
+      contact.firstName = 'Unknown'
+    }
 
     if (Object.keys(customFields).length > 0) {
       contact.customFields = customFields

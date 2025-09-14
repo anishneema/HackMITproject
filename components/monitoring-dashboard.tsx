@@ -1,14 +1,40 @@
 "use client"
 
+import { useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Bot, Mail, MessageSquare, Users, MapPin, CheckCircle, Clock, AlertTriangle, TrendingUp } from "lucide-react"
 import { useDashboardStore } from "@/lib/dashboard-store"
+import { EmailInsightsPanel } from "@/components/email-insights-panel"
 
 export function MonitoringDashboard() {
-  const { events, campaigns, bookings, getDashboardTotals } = useDashboardStore()
-  const totals = getDashboardTotals()
+  const events = useDashboardStore((state) => state.events)
+  const campaigns = useDashboardStore((state) => state.campaigns)
+  const bookings = useDashboardStore((state) => state.bookings)
+
+  const totals = useMemo(() => {
+    const activeEvents = events.filter(e => e.status === 'active').length
+    const totalEmailsSent = events.reduce((sum, event) => sum + (event.emailsSent || 0), 0)
+    const totalEmailsReplied = events.reduce((sum, event) => sum + (event.emailsReplied || 0), 0)
+    const averageResponseRate = totalEmailsSent > 0 ? (totalEmailsReplied / totalEmailsSent) * 100 : 0
+
+    const recentActivity = bookings.slice(-10).map(booking => ({
+      type: 'booking_received' as const,
+      eventName: events.find(e => e.id === booking.eventId)?.name || 'Unknown Event',
+      timestamp: booking.bookingDate,
+      details: `${booking.participantName} booked for ${booking.eventDate.toLocaleDateString()}`
+    })).sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).slice(0, 5)
+
+    return {
+      totalEvents: events.length,
+      activeEvents,
+      totalEmailsSent,
+      averageResponseRate,
+      totalBookings: bookings.length,
+      recentActivity
+    }
+  }, [events, campaigns, bookings])
   const aiActivities = [
     {
       id: 1,
@@ -61,10 +87,10 @@ export function MonitoringDashboard() {
   ]
 
   const campaignMetrics = [
-    { label: "Emails Sent", value: 447, change: "+18%", icon: Mail },
-    { label: "SMS Sent", value: 189, change: "+12%", icon: MessageSquare },
-    { label: "Responses", value: 267, change: "+28%", icon: Users },
-    { label: "RSVPs", value: 146, change: "+22%", icon: CheckCircle },
+    { label: "Emails Sent", value: totals.totalEmailsSent, change: "+18%", icon: Mail },
+    { label: "Response Rate", value: `${totals.averageResponseRate.toFixed(1)}%`, change: "+12%", icon: MessageSquare },
+    { label: "Active Events", value: totals.activeEvents, change: "+28%", icon: Users },
+    { label: "Total Bookings", value: totals.totalBookings, change: "+22%", icon: CheckCircle },
   ]
 
   const getStatusIcon = (status: string) => {
@@ -171,10 +197,10 @@ export function MonitoringDashboard() {
 
             <div>
               <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-medium">RSVP Conversion</span>
-                <span className="text-sm text-muted-foreground">36%</span>
+                <span className="text-sm font-medium">Response Rate</span>
+                <span className="text-sm text-muted-foreground">{totals.averageResponseRate.toFixed(1)}%</span>
               </div>
-              <Progress value={36} className="h-2" />
+              <Progress value={totals.averageResponseRate} className="h-2" />
             </div>
 
             <div>
@@ -293,6 +319,17 @@ export function MonitoringDashboard() {
               </div>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* AgentMail Email Insights */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Email Intelligence</CardTitle>
+          <CardDescription>AI-powered insights from AgentMail analysis</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <EmailInsightsPanel />
         </CardContent>
       </Card>
     </div>

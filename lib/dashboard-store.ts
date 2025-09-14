@@ -1,7 +1,6 @@
 'use client'
 
 import { create } from 'zustand'
-import { subscribeWithSelector, persist } from 'zustand/middleware'
 
 export interface DashboardEvent {
   id: string
@@ -56,6 +55,11 @@ export interface DashboardStore {
   campaigns: EmailCampaignStats[]
   bookings: CalendarBooking[]
   addEvent: (event: Omit<DashboardEvent, 'id' | 'createdAt' | 'updatedAt'>) => string
+  updateEvent: (eventId: string, updates: Partial<DashboardEvent>) => void
+  onEmailSent: (eventId: string, count: number) => void
+  onEmailOpened: (eventId: string, count: number) => void
+  onEmailReplied: (eventId: string, reply: { sentiment: string; participantEmail: string; content?: string }) => void
+  onBookingReceived: (eventId: string, booking: { participantEmail: string; participantName: string; eventDate: Date }) => void
   getDashboardTotals: () => {
     totalEvents: number
     activeEvents: number
@@ -79,7 +83,6 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   bookings: [],
 
   addEvent: (eventData) => {
-    console.log("Dashboard store addEvent called with:", eventData)
     const id = generateId()
     const event: DashboardEvent = {
       ...eventData,
@@ -88,29 +91,114 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
       updatedAt: new Date()
     }
 
-    set((state) => {
-      const newEvents = [...state.events, event]
-      console.log("Dashboard store updating events:", newEvents)
-      return {
-        events: newEvents
-      }
-    })
+    set((state) => ({
+      events: [...state.events, event]
+    }))
 
-    console.log("Dashboard store addEvent returning ID:", id)
     return id
+  },
+
+  updateEvent: (eventId, updates) => {
+    set((state) => ({
+      events: state.events.map(event =>
+        event.id === eventId
+          ? { ...event, ...updates, updatedAt: new Date() }
+          : event
+      )
+    }))
+  },
+
+  onEmailSent: (eventId, count) => {
+    set((state) => ({
+      events: state.events.map(event =>
+        event.id === eventId
+          ? {
+              ...event,
+              emailsSent: (event.emailsSent || 0) + count,
+              lastEmailSent: new Date(),
+              updatedAt: new Date()
+            }
+          : event
+      )
+    }))
+  },
+
+  onEmailOpened: (eventId, count) => {
+    set((state) => ({
+      events: state.events.map(event =>
+        event.id === eventId
+          ? {
+              ...event,
+              emailsOpened: (event.emailsOpened || 0) + count,
+              updatedAt: new Date()
+            }
+          : event
+      )
+    }))
+  },
+
+  onEmailReplied: (eventId, reply) => {
+    set((state) => ({
+      events: state.events.map(event =>
+        event.id === eventId
+          ? {
+              ...event,
+              emailsReplied: (event.emailsReplied || 0) + 1,
+              updatedAt: new Date()
+            }
+          : event
+      )
+    }))
+  },
+
+  onBookingReceived: (eventId, booking) => {
+    const newBooking: CalendarBooking = {
+      id: generateId(),
+      eventId,
+      participantEmail: booking.participantEmail,
+      participantName: booking.participantName,
+      bookingDate: new Date(),
+      eventDate: booking.eventDate,
+      status: 'confirmed',
+      source: 'email_response'
+    }
+
+    set((state) => ({
+      bookings: [...state.bookings, newBooking],
+      events: state.events.map(event =>
+        event.id === eventId
+          ? {
+              ...event,
+              currentRSVPs: (event.currentRSVPs || 0) + 1,
+              updatedAt: new Date()
+            }
+          : event
+      )
+    }))
   },
 
   getDashboardTotals: () => {
     const state = get()
     const activeEvents = state.events.filter(e => e.status === 'active').length
+    const totalEmailsSent = state.events.reduce((sum, event) => sum + (event.emailsSent || 0), 0)
+    const totalEmailsReplied = state.events.reduce((sum, event) => sum + (event.emailsReplied || 0), 0)
+    const averageResponseRate = totalEmailsSent > 0 ? (totalEmailsReplied / totalEmailsSent) * 100 : 0
+
+    // Create stable recent activity array to prevent infinite re-renders
+    const recentActivity = state.bookings.slice(-10).map(booking => ({
+      type: 'booking_received' as const,
+      eventName: state.events.find(e => e.id === booking.eventId)?.name || 'Unknown Event',
+      timestamp: booking.bookingDate,
+      details: `${booking.participantName} booked for ${booking.eventDate.toLocaleDateString()}`
+    })).sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).slice(0, 5)
 
     return {
       totalEvents: state.events.length,
       activeEvents,
-      totalEmailsSent: 0,
-      averageResponseRate: 0,
-      totalBookings: 0,
-      recentActivity: []
+      totalEmailsSent,
+      averageResponseRate,
+      totalBookings: state.bookings.length,
+      recentActivity
     }
   }
 }))

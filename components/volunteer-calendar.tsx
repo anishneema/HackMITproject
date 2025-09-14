@@ -6,12 +6,15 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Calendar, ChevronLeft, ChevronRight, Clock, Users, MapPin, Phone, Mail } from "lucide-react"
+import { Calendar, ChevronLeft, ChevronRight, Clock, Users, MapPin, Phone, Mail, MessageSquare } from "lucide-react"
+import { useDashboardStore } from "@/lib/dashboard-store"
 
 export function VolunteerCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+
+  const bookings = useDashboardStore((state) => state.bookings)
 
   // Sample volunteer data with 2025 dates
   const volunteers = [
@@ -378,6 +381,52 @@ export function VolunteerCalendar() {
                 </div>
               </div>
             ))}
+          </CardContent>
+        </Card>
+
+        {/* Email RSVPs powered by AgentMail */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5" />
+              Email RSVPs
+            </CardTitle>
+            <CardDescription>
+              Recent confirmations received via email (powered by AgentMail)
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {bookings.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">
+                No email RSVPs received yet
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {bookings.slice(0, 5).map((booking) => (
+                  <div key={booking.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback className="text-xs">
+                          {booking.participantName.split(' ').map(n => n[0]).join('')}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium text-sm">{booking.participantName}</p>
+                        <p className="text-xs text-muted-foreground">{booking.participantEmail}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <Badge variant="secondary" className="text-xs">
+                        {booking.eventDate.toLocaleDateString()}
+                      </Badge>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        via {booking.source}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

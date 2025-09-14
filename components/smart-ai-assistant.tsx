@@ -36,7 +36,7 @@ export function SmartAIAssistant() {
 
   // Get dashboard data
   const dashboardStore = useDashboardStore()
-  const { events, campaigns, bookings, getDashboardTotals, addEvent, addCampaign, onEmailSent } = dashboardStore
+  const { events, campaigns, bookings, getDashboardTotals, addEvent, onEmailSent } = dashboardStore
 
   // Create initial session if none exists
   useEffect(() => {
@@ -71,11 +71,11 @@ export function SmartAIAssistant() {
 
     try {
       // Process with Claude AI using dashboard data and conversation history
-      const conversationHistory = activeSession.messages.map(msg => ({
+      const conversationHistory = activeSession?.messages.map(msg => ({
         type: msg.type,
         content: msg.content,
         timestamp: msg.timestamp
-      }))
+      })) || []
 
       const aiResponse: AIResponse = await queryDashboardData(currentInput, conversationHistory)
 
@@ -205,27 +205,13 @@ export function SmartAIAssistant() {
         }
 
         if (action.type === 'email_campaign' && action.status === 'pending') {
-          // Create a sample campaign
+          // Simulate email campaign activity
           const eventId = events.length > 0 ? events[0].id : null
           if (eventId) {
-            addCampaign({
-              eventId,
-              name: "AI Generated Campaign",
-              totalSent: 50,
-              opened: 0,
-              replied: 0,
-              bounced: 0,
-              unsubscribed: 0,
-              responseRate: 0,
-              sentimentBreakdown: {
-                positive: 0,
-                negative: 0,
-                neutral: 0,
-                questions: 0
-              },
-              lastActivity: new Date(),
-              status: 'sending'
-            })
+            // Simulate email sending
+            setTimeout(() => {
+              onEmailSent(eventId, 50)
+            }, 2000)
           }
         }
       }
@@ -233,8 +219,17 @@ export function SmartAIAssistant() {
   }
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('File Upload Debug: handleFileUpload called')
     const file = event.target.files?.[0]
-    if (!file || !file.name.endsWith(".csv") || !activeSessionId) return
+    console.log('File Upload Debug: file object:', file)
+    console.log('File Upload Debug: activeSessionId:', activeSessionId)
+
+    if (!file || !file.name.endsWith(".csv") || !activeSessionId) {
+      console.log('File Upload Debug: Early return - file check failed')
+      return
+    }
+
+    console.log('File Upload Debug: Starting file processing for:', file.name)
 
     // Add user message for file upload
     addMessage(activeSessionId, {
@@ -245,11 +240,18 @@ export function SmartAIAssistant() {
     setProcessing(activeSessionId, true)
 
     try {
-      // Process with Claude AI
+      console.log('File Upload Debug: Calling claudeAI.handleCSVUpload')
+      // Process with Claude AI first for validation
       const aiResponse = await claudeAI.handleCSVUpload(file)
 
-      // Process CSV and start email automation
+      // If AI validation passed, process CSV
+      console.log('File Upload Debug: AI validation passed, processing CSV')
       const contacts = await CSVReader.parseCSVFile(file)
+      console.log('Processed contacts:', contacts)
+
+      if (contacts.length === 0) {
+        throw new Error('No valid contacts found in the CSV file. Please check that your file has proper email addresses and at least one name column.')
+      }
 
       // Create a sample event for the campaign if none exists
       let eventId = events.length > 0 ? events[0].id : null
@@ -265,42 +267,81 @@ export function SmartAIAssistant() {
         })
       }
 
-      // Add campaign
-      const campaignId = addCampaign({
-        eventId,
-        name: `Email Campaign - ${file.name}`,
-        totalSent: contacts.length,
-        opened: 0,
-        replied: 0,
-        bounced: 0,
-        unsubscribed: 0,
-        responseRate: 0,
-        sentimentBreakdown: {
-          positive: 0,
-          negative: 0,
-          neutral: 0,
-          questions: 0
-        },
-        lastActivity: new Date(),
-        status: 'sending'
-      })
-
       // Simulate email sending
       setTimeout(() => {
         onEmailSent(eventId!, contacts.length)
       }, 2000)
 
-      // Start Agent Mail campaign if available
-      if (agentMailService.isReady()) {
-        await agentMailService.startEmailCampaign({
-          eventId,
-          eventName: "Blood Drive Campaign",
-          contacts,
-          emailTemplate: {
-            subject: "Join Us for a Life-Saving Blood Drive!",
-            body: `Hello {{firstName}},\n\nWe hope this message finds you well. We're reaching out to invite you to participate in our upcoming blood drive.\n\nYour support has always been invaluable to our mission, and we would be honored to have you join us for this important initiative.\n\nPlease feel free to reply to this email with any questions or to confirm your participation.\n\nThank you for your continued support of the Red Cross mission.\n\nBest regards,\nRed Cross Events Team`
-          }
+      // Send emails via AgentMail API
+      try {
+        console.log('Sending emails via AgentMail API...')
+        
+        const emailTemplate = {
+          subject: "Join Us for a Life-Saving Blood Drive!",
+          body: `Hello {{firstName}},
+
+We hope this message finds you well. We're reaching out to invite you to participate in our upcoming blood drive.
+
+Your support has always been invaluable to our mission, and we would be honored to have you join us for this important initiative.
+
+Our next event details:
+- Date: This Saturday
+- Time: 9:00 AM - 3:00 PM
+- Location: Community Center
+- Duration: Typically 3-4 hours
+
+Your contribution can make a real difference in saving lives. One blood donation can help save up to three lives!
+
+Please reply to this email if you're interested in participating, and we'll send you the specific details once they're confirmed.
+
+Thank you for considering this opportunity to help others.
+
+Best regards,
+Red Cross Events Team`
+        }
+
+        const emailResponse = await fetch('/api/email/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contacts: contacts,
+            subject: emailTemplate.subject,
+            body: emailTemplate.body,
+            eventName: "Blood Drive Campaign"
+          })
         })
+
+        if (emailResponse.ok) {
+          const result = await emailResponse.json()
+          console.log('Emails sent successfully via SMTP:', result)
+          
+          // Update the AI response to include email sending success
+          const successMessage = result.success 
+            ? `📧 I've sent personalized emails to all ${contacts.length} contacts! They will receive invitations to our blood drive event in their inbox.`
+            : `📧 I've sent emails to ${result.details?.sent || 0} contacts, but ${result.details?.failed || 0} failed to send.`
+          
+          aiResponse.content += `\n\n✅ **Emails Sent Successfully!**\n${successMessage}\n\n**Campaign Details:**\n- Campaign ID: ${result.campaignId}\n- Emails Sent: ${result.details?.sent || 0}\n- Emails Failed: ${result.details?.failed || 0}\n- From: ${result.details?.fromName} <${result.details?.fromEmail}>\n- Status: ${result.success ? 'Completed' : 'Partial Success'}`
+          
+          if (result.details?.errors && result.details.errors.length > 0) {
+            aiResponse.content += `\n\n**Errors:**\n${result.details.errors.slice(0, 3).join('\n')}`
+            if (result.details.errors.length > 3) {
+              aiResponse.content += `\n... and ${result.details.errors.length - 3} more errors`
+            }
+          }
+        } else {
+          const errorData = await emailResponse.json()
+          console.error('Failed to send emails via SMTP:', errorData)
+          
+          // Update the AI response to include email sending failure
+          aiResponse.content += `\n\n⚠️ **Email Sending Issue**\nI processed your CSV file successfully, but encountered an issue sending emails. ${errorData.details || 'Please check your email configuration.'}`
+        }
+      } catch (error) {
+        console.error('Error sending emails via SMTP:', error)
+        
+        // Update the AI response to include email sending error
+        aiResponse.content += `\n\n⚠️ **Email Sending Error**\nI processed your CSV file successfully, but encountered an error sending emails. Please try again or check your email configuration.`
       }
 
       // Add assistant response
@@ -312,13 +353,30 @@ export function SmartAIAssistant() {
 
     } catch (error) {
       console.error('Error processing CSV:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      
       addMessage(activeSessionId, {
         type: "assistant",
-        content: "I encountered an error processing your CSV file. Please make sure it includes columns for 'email', 'firstName', and 'lastName'. You can try uploading the file again.",
+        content: `❌ I encountered an error processing your CSV file: ${errorMessage}
+
+**Common CSV format requirements:**
+• Must have an 'email' column (required)
+• Should have at least one name column (like 'name', 'firstName', 'lastName', etc.)
+• Use comma (,) or semicolon (;) as separators
+• Make sure email addresses are valid
+
+**Example CSV format:**
+\`\`\`
+email,name,phone
+john@example.com,John Doe,555-1234
+jane@example.com,Jane Smith,555-5678
+\`\`\`
+
+Please check your file format and try uploading again.`,
         actions: [{
           type: "csv_processed",
           status: "failed",
-          details: "CSV processing failed - please check file format"
+          details: errorMessage
         }]
       })
     } finally {
@@ -479,7 +537,10 @@ export function SmartAIAssistant() {
             <Button
               variant="outline"
               size="icon"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => {
+                console.log('Upload Button Debug: Button clicked, opening file dialog')
+                fileInputRef.current?.click()
+              }}
               className="flex-shrink-0"
               disabled={isProcessing}
             >
