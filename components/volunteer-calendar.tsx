@@ -18,6 +18,7 @@ export function VolunteerCalendar() {
   const [isLoading, setIsLoading] = useState(true)
 
   const bookings = useDashboardStore((state) => state.bookings)
+  const dashboardEvents = useDashboardStore((state) => state.events)
 
   // Load volunteers from API
   useEffect(() => {
@@ -69,7 +70,26 @@ export function VolunteerCalendar() {
   }
 
   // Generate events dynamically from volunteer data
-  const events = generateEventsFromVolunteers(volunteers)
+  const volunteerEvents = generateEventsFromVolunteers(volunteers)
+  
+  // Combine volunteer events with dashboard events
+  const allEvents = [...volunteerEvents]
+  
+  // Add dashboard events that don't conflict with volunteer events
+  dashboardEvents.forEach(dashboardEvent => {
+    const existingEvent = volunteerEvents.find(event => event.date === dashboardEvent.date)
+    if (!existingEvent) {
+      allEvents.push({
+        date: dashboardEvent.date,
+        name: dashboardEvent.name,
+        location: dashboardEvent.venue,
+        volunteers: [],
+        isDashboardEvent: true
+      })
+    }
+  })
+  
+  const events = allEvents
 
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear()
@@ -97,7 +117,24 @@ export function VolunteerCalendar() {
   const getEventForDate = (day: number) => {
     if (!day) return null
     const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
-    return events.find((event) => event.date === dateStr)
+    
+    // First check for volunteer events
+    const volunteerEvent = events.find((event) => event.date === dateStr)
+    if (volunteerEvent) return volunteerEvent
+    
+    // Then check for dashboard events
+    const dashboardEvent = dashboardEvents.find((event) => event.date === dateStr)
+    if (dashboardEvent) {
+      return {
+        date: dateStr,
+        name: dashboardEvent.name,
+        location: dashboardEvent.venue,
+        volunteers: [], // Dashboard events don't have volunteers yet
+        isDashboardEvent: true // Flag to distinguish from volunteer events
+      }
+    }
+    
+    return null
   }
 
   const handleDateClick = (day: number) => {
@@ -217,8 +254,8 @@ export function VolunteerCalendar() {
                       <div className="text-sm font-medium mb-1">{day}</div>
                       {event && (
                         <div className="space-y-1">
-                          <Badge variant="secondary" className="text-xs">
-                            {event.name.split(" ")[0]} Drive
+                          <Badge variant={event.isDashboardEvent ? "default" : "secondary"} className="text-xs">
+                            {event.isDashboardEvent ? event.name : `${event.name.split(" ")[0]} Drive`}
                           </Badge>
                           <div className="flex -space-x-1">
                             {event.volunteers.slice(0, 3).map((volunteer) => (

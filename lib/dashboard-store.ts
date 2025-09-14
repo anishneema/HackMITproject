@@ -205,13 +205,28 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
     try {
       set({ isLoading: true, error: null })
       const apiEvents = await apiService.getEvents()
-      const events = apiEvents.map(event => ({
+      const apiEventsFormatted = apiEvents.map(event => ({
         ...event,
         lastEmailSent: event.lastEmailSent ? new Date(event.lastEmailSent) : undefined,
         createdAt: new Date(event.createdAt),
         updatedAt: new Date(event.updatedAt)
       }))
-      set({ events, isLoading: false })
+      
+      // Merge API events with local events, prioritizing local events for duplicates
+      set((state) => {
+        const localEvents = state.events
+        const mergedEvents = [...apiEventsFormatted]
+        
+        // Add local events that don't exist in API (newly created events)
+        localEvents.forEach(localEvent => {
+          const existsInAPI = apiEventsFormatted.some(apiEvent => apiEvent.id === localEvent.id)
+          if (!existsInAPI) {
+            mergedEvents.push(localEvent)
+          }
+        })
+        
+        return { events: mergedEvents, isLoading: false }
+      })
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to load events',

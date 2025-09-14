@@ -10,9 +10,10 @@ import { claudeAI, AIResponse } from "@/lib/claude-ai-service"
 import { queryDashboardData } from "@/lib/query-dashboard-data"
 import { CSVReader } from "@/lib/email-automation/csv-reader"
 import { agentMailService } from "@/lib/agent-mail-service"
-import { Bot, User, Send, Upload, Calendar, MapPin, Mail, Users, CheckCircle, Clock, AlertCircle, BarChart } from "lucide-react"
+import { Bot, User, Send, Upload, Calendar, MapPin, Mail, Users, CheckCircle, Clock, AlertCircle, BarChart, Plus } from "lucide-react"
 import { ChatSidebar } from "./chat-sidebar"
 import { CSVTableVisualization } from "./csv-table-visualization"
+import { EventCreationModal } from "./event-creation-modal"
 // import "@/lib/sample-data" // Initialize sample data - temporarily disabled for debugging
 
 export function SmartAIAssistant() {
@@ -38,7 +39,7 @@ export function SmartAIAssistant() {
 
   // Get dashboard data
   const dashboardStore = useDashboardStore()
-  const { events, campaigns, bookings, getDashboardTotals, addEvent, onEmailSent } = dashboardStore
+  const { events, campaigns, bookings, getDashboardTotals, addEvent, onEmailSent, createEventAPI } = dashboardStore
 
   // Create initial session if none exists
   useEffect(() => {
@@ -323,6 +324,187 @@ export function SmartAIAssistant() {
 
   const removeAttachedFile = (index: number) => {
     setAttachedFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const handleEventCreated = async (eventData: {
+    name: string;
+    date: string;
+    time: string;
+    location: string;
+    targetDonors: number;
+    csvFile?: File;
+  }) => {
+    try {
+      // Add the event to the dashboard store (local)
+      const eventId = addEvent({
+        name: eventData.name,
+        date: eventData.date,
+        time: eventData.time,
+        targetDonors: eventData.targetDonors,
+        currentRSVPs: 0,
+        venue: eventData.location,
+        status: "active"
+      });
+
+      // Also create the event via API to ensure persistence
+      try {
+        console.log('Creating event via API:', eventData);
+        const apiEventId = await createEventAPI({
+          name: eventData.name,
+          date: eventData.date,
+          time: eventData.time,
+          targetDonors: eventData.targetDonors,
+          currentRSVPs: 0,
+          venue: eventData.location,
+          status: "active"
+        });
+        console.log('Event created via API with ID:', apiEventId);
+      } catch (apiError) {
+        console.error('Failed to create event via API:', apiError);
+        console.warn('Local event was created but may not persist across tab switches');
+      }
+
+      // Process CSV file and send emails if provided
+      let emailResult = null;
+      if (eventData.csvFile) {
+        try {
+          console.log('Processing CSV file for event:', eventData.csvFile.name);
+          const contacts = await CSVReader.parseCSVFile(eventData.csvFile);
+          
+          if (contacts.length > 0) {
+            // Create email template for the event
+            const emailTemplate = {
+              subject: `Join Us for ${eventData.name}!`,
+              body: `Hello {{firstName}},
+
+We hope this message finds you well. We're reaching out to invite you to participate in our upcoming blood drive event.
+
+**Event Details:**
+• **Event:** ${eventData.name}
+• **Date:** ${eventData.date}
+• **Time:** ${eventData.time}
+• **Location:** ${eventData.location}
+
+Your support has always been invaluable to our mission, and we would be honored to have you join us for this important initiative.
+
+Your contribution can make a real difference in saving lives. One blood donation can help save up to three lives!
+
+Please reply to this email if you're interested in participating, and we'll send you the specific details once they're confirmed.
+
+Thank you for considering this opportunity to help others.
+
+Best regards,
+Red Cross Events Team`
+            };
+
+            // Send emails via AgentMail API
+            console.log('Attempting to send emails to:', contacts.length, 'contacts');
+            console.log('Email template:', emailTemplate);
+            
+            const emailResponse = await fetch('/api/email/send', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                contacts: contacts,
+                subject: emailTemplate.subject,
+                body: emailTemplate.body,
+                eventName: eventData.name
+              })
+            });
+
+            console.log('Email response status:', emailResponse.status);
+            console.log('Email response ok:', emailResponse.ok);
+
+            if (emailResponse.ok) {
+              emailResult = await emailResponse.json();
+              console.log('Emails sent successfully for event:', emailResult);
+              
+              // Update the event with email count
+              onEmailSent(eventId, contacts.length);
+            } else {
+              const errorData = await emailResponse.json();
+              console.error('Failed to send emails for event:', errorData);
+              emailResult = { success: false, error: errorData.details || errorData.error || 'Failed to send emails' };
+            }
+          }
+        } catch (error) {
+          console.error('Error processing CSV for event:', error);
+          if (error instanceof TypeError && error.message.includes('fetch')) {
+            emailResult = { success: false, error: 'Network error: Unable to connect to email service. Please check your internet connection.' };
+          } else {
+            emailResult = { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+          }
+        }
+      }
+
+      // Add a success message to the chat
+      if (activeSessionId) {
+        let successMessage = `✅ **Event Created Successfully!**
+
+**Event Details:**
+• **Name:** ${eventData.name}
+• **Date:** ${eventData.date}
+• **Time:** ${eventData.time}
+• **Location:** ${eventData.location}
+• **Target Donors:** ${eventData.targetDonors}`;
+
+        if (eventData.csvFile && emailResult) {
+          if (emailResult.success) {
+            successMessage += `
+
+📧 **Emails Sent Successfully!**
+• **Volunteers Notified:** ${emailResult.details?.sent || 0}
+• **Campaign ID:** ${emailResult.campaignId}
+• **Status:** Completed`;
+          } else {
+            successMessage += `
+
+⚠️ **Email Sending Issue**
+• **Error:** ${emailResult.error}
+• **Note:** Event was created but emails could not be sent`;
+          }
+        } else if (eventData.csvFile) {
+          successMessage += `
+
+📧 **CSV File Processed**
+• **Volunteers Found:** ${eventData.csvFile.name}
+• **Note:** Emails will be sent automatically`;
+        }
+
+        successMessage += `
+
+Your new blood drive event has been added to the calendar and is now active. You can view it on the dashboard or ask me about it anytime!`;
+
+        addMessage(activeSessionId, {
+          type: "assistant",
+          content: successMessage,
+          actions: [{
+            type: "event_created",
+            status: "completed",
+            details: `Created event: ${eventData.name}${emailResult?.success ? ` and sent ${emailResult.details?.sent || 0} emails` : ''}`
+          }]
+        });
+      }
+    } catch (error) {
+      console.error('Failed to create event:', error);
+      
+      // Add an error message to the chat
+      if (activeSessionId) {
+        addMessage(activeSessionId, {
+          type: "assistant",
+          content: `❌ **Failed to Create Event**
+
+There was an error creating your event. Please try again.`,
+          actions: [{
+            type: "event_created",
+            status: "failed",
+            details: `Failed to create event: ${eventData.name}`
+          }]
+        });
+      }
+    }
   }
 
   const analyzeCSVContent = async (csvFiles: File[], userQuestion: string, conversationHistory: any[]): Promise<AIResponse> => {
@@ -662,6 +844,18 @@ Red Cross Events Team`
                         }
                         return <p key={index} className="mb-2">{line}</p>
                       })}
+                      
+                      {/* Add Create Event button to the default welcome message */}
+                      {message.content.includes("Hello! I'm your intelligent Blood Drive AI Assistant") && (
+                        <div className="mt-4 pt-4 border-t border-muted-foreground/20">
+                          <EventCreationModal onEventCreated={handleEventCreated}>
+                            <Button className="w-full" variant="outline">
+                              <Plus className="mr-2 h-4 w-4" />
+                              Create New Blood Drive Event
+                            </Button>
+                          </EventCreationModal>
+                        </div>
+                      )}
                     </div>
                     
                     {/* CSV Table Visualization */}

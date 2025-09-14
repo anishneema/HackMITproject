@@ -166,18 +166,10 @@ export function MonitoringDashboard() {
           <CardContent className="space-y-6">
             <div>
               <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-medium">Email Open Rate</span>
-                <span className="text-sm text-muted-foreground">68%</span>
+                <span className="text-sm font-medium">Total Emails Sent</span>
+                <span className="text-sm text-muted-foreground">{totals.totalEmailsSent}</span>
               </div>
-              <Progress value={68} className="h-2" />
-            </div>
-
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-medium">Click-through Rate</span>
-                <span className="text-sm text-muted-foreground">42%</span>
-              </div>
-              <Progress value={42} className="h-2" />
+              <Progress value={Math.min(totals.totalEmailsSent, 100)} className="h-2" />
             </div>
 
             <div>
@@ -190,10 +182,18 @@ export function MonitoringDashboard() {
 
             <div>
               <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-medium">SMS Response Rate</span>
-                <span className="text-sm text-muted-foreground">24%</span>
+                <span className="text-sm font-medium">Active Events</span>
+                <span className="text-sm text-muted-foreground">{totals.activeEvents}</span>
               </div>
-              <Progress value={24} className="h-2" />
+              <Progress value={Math.min(totals.activeEvents * 20, 100)} className="h-2" />
+            </div>
+
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-medium">Total Bookings</span>
+                <span className="text-sm text-muted-foreground">{totals.totalBookings}</span>
+              </div>
+              <Progress value={Math.min(totals.totalBookings * 10, 100)} className="h-2" />
             </div>
           </CardContent>
         </Card>
@@ -206,104 +206,62 @@ export function MonitoringDashboard() {
           <CardDescription>Automated outreach effectiveness by event</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="p-4 border rounded-lg">
-                <h4 className="font-medium">Community Center Drive</h4>
-                <p className="text-sm text-muted-foreground">Sep 14, 2025</p>
-                <div className="mt-2 space-y-1">
-                  <div className="flex justify-between text-sm">
-                    <span>Invites Sent:</span>
-                    <span>120</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>RSVPs:</span>
-                    <span className="text-green-600">23</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Conversion:</span>
-                    <span>19%</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-4 border rounded-lg">
-                <h4 className="font-medium">University Campus Drive</h4>
-                <p className="text-sm text-muted-foreground">Sep 18, 2025</p>
-                <div className="mt-2 space-y-1">
-                  <div className="flex justify-between text-sm">
-                    <span>Invites Sent:</span>
-                    <span>156</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>RSVPs:</span>
-                    <span className="text-green-600">42</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Conversion:</span>
-                    <span>27%</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-4 border rounded-lg">
-                <h4 className="font-medium">Corporate Office Drive</h4>
-                <p className="text-sm text-muted-foreground">Sep 20, 2025</p>
-                <div className="mt-2 space-y-1">
-                  <div className="flex justify-between text-sm">
-                    <span>Invites Sent:</span>
-                    <span>89</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>RSVPs:</span>
-                    <span className="text-green-600">18</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Conversion:</span>
-                    <span>20%</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-4 border rounded-lg">
-                <h4 className="font-medium">Mall Plaza Drive</h4>
-                <p className="text-sm text-muted-foreground">Sep 25, 2025</p>
-                <div className="mt-2 space-y-1">
-                  <div className="flex justify-between text-sm">
-                    <span>Invites Sent:</span>
-                    <span>134</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>RSVPs:</span>
-                    <span className="text-green-600">35</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Conversion:</span>
-                    <span>26%</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-4 border rounded-lg">
-                <h4 className="font-medium">Tech Campus Drive</h4>
-                <p className="text-sm text-muted-foreground">Sep 28, 2025</p>
-                <div className="mt-2 space-y-1">
-                  <div className="flex justify-between text-sm">
-                    <span>Invites Sent:</span>
-                    <span>98</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>RSVPs:</span>
-                    <span className="text-green-600">28</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Conversion:</span>
-                    <span>29%</span>
-                  </div>
-                </div>
+          {events.length > 0 ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {events.map((event) => {
+                  const conversionRate = event.emailsSent > 0 ? 
+                    ((event.emailsReplied || 0) / event.emailsSent * 100).toFixed(1) : '0'
+                  
+                  return (
+                    <div key={event.id} className="p-4 border rounded-lg">
+                      <h4 className="font-medium">{event.name}</h4>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(event.date).toLocaleDateString('en-US', { 
+                          month: 'short', 
+                          day: 'numeric', 
+                          year: 'numeric' 
+                        })}
+                      </p>
+                      <div className="mt-2 space-y-1">
+                        <div className="flex justify-between text-sm">
+                          <span>Invites Sent:</span>
+                          <span>{event.emailsSent || 0}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>RSVPs:</span>
+                          <span className="text-green-600">{event.currentRSVPs || 0}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>Conversion:</span>
+                          <span>{conversionRate}%</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>Target Donors:</span>
+                          <span>{event.targetDonors || 0}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>Status:</span>
+                          <span className={`px-2 py-1 rounded text-xs ${
+                            event.status === 'active' ? 'bg-green-100 text-green-800' : 
+                            event.status === 'completed' ? 'bg-blue-100 text-blue-800' : 
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {event.status}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="text-center text-muted-foreground py-8">
+              <p>No events created yet.</p>
+              <p className="text-sm">Create your first blood drive event using the AI Assistant!</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
