@@ -9,6 +9,10 @@ export interface AIResponse {
     status: 'completed' | 'pending' | 'failed'
     details: string
   }>
+  csvData?: {
+    contacts: any[]
+    fileName: string
+  }
 }
 
 export class ClaudeAIService {
