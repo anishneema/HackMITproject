@@ -27,12 +27,6 @@ export interface APICampaign {
   bounced: number
   unsubscribed: number
   responseRate: number
-  sentimentBreakdown: {
-    positive: number
-    negative: number
-    neutral: number
-    questions: number
-  }
   lastActivity: string
   status: 'draft' | 'sending' | 'completed' | 'paused'
   createdAt: string

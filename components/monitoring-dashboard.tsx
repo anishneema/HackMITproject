@@ -7,7 +7,6 @@ import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
 import { Bot, Mail, MessageSquare, Users, MapPin, CheckCircle, Clock, AlertTriangle, TrendingUp, RefreshCw } from "lucide-react"
 import { useDashboardData } from "@/lib/use-dashboard-data"
-import { EmailInsightsPanel } from "@/components/email-insights-panel"
 import { apiService } from "@/lib/api-service"
 
 export function MonitoringDashboard() {
@@ -308,16 +307,6 @@ export function MonitoringDashboard() {
         </CardContent>
       </Card>
 
-      {/* AgentMail Email Insights */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Email Intelligence</CardTitle>
-          <CardDescription>AI-powered insights from AgentMail analysis</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <EmailInsightsPanel />
-        </CardContent>
-      </Card>
     </div>
   )
 }

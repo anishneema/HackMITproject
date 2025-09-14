@@ -33,12 +33,6 @@ export async function POST(request: NextRequest) {
       bounced: campaignData.bounced || 0,
       unsubscribed: campaignData.unsubscribed || 0,
       responseRate: campaignData.responseRate || 0,
-      sentimentBreakdown: campaignData.sentimentBreakdown || {
-        positive: 0,
-        negative: 0,
-        neutral: 0,
-        questions: 0
-      },
       status: campaignData.status || 'draft'
     }
 

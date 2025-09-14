@@ -98,7 +98,7 @@ export class AgentMailEmailSender {
         console.log(`Email sent successfully to ${contact.email} via AgentMail`)
 
         // Add a small delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        await new Promise(resolve => setTimeout(resolve, 100))
 
       } catch (error) {
         results.failed++

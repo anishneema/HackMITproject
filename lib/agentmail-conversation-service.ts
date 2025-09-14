@@ -36,7 +36,7 @@ class AgentMailConversationServiceImpl implements AgentMailConversationService {
   private isInitialized = false
 
   constructor() {
-    this.inboxEmail = process.env.AGENT_MAIL_INBOX || 'hackmit@agentmail.to'
+    this.inboxEmail = process.env.AGENT_MAIL_INBOX || 'orcha@agentmail.to'
     this.initializeClient()
   }
 
@@ -218,6 +218,34 @@ class AgentMailConversationServiceImpl implements AgentMailConversationService {
       return true
     } catch (error) {
       console.error(`❌ Failed to mark message ${messageId} as read:`, error)
+      return false
+    }
+  }
+
+  async createInbox(): Promise<boolean> {
+    if (!this.isInitialized || !this.client) {
+      console.error('❌ AgentMail client not initialized')
+      return false
+    }
+
+    try {
+      console.log('📧 Creating AgentMail inbox: orcha@agentmail.to')
+
+      const { data, rawResponse } = await this.client.inboxes.create({
+        username: 'orcha',
+        domain: 'agentmail.to',
+        displayName: 'orcha- Blood Drive',
+        clientId: undefined,
+      }).withRawResponse()
+
+      console.log('✅ Inbox created successfully!')
+      console.log('📡 Create inbox status:', rawResponse.status)
+      console.log('📋 Inbox details:', data)
+
+      return true
+    } catch (error) {
+      console.error('❌ Failed to create inbox:', error)
+      console.error('Error details:', error)
       return false
     }
   }

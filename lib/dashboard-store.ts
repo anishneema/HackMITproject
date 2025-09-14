@@ -30,12 +30,6 @@ export interface EmailCampaignStats {
   bounced: number
   unsubscribed: number
   responseRate: number
-  sentimentBreakdown: {
-    positive: number
-    negative: number
-    neutral: number
-    questions: number
-  }
   lastActivity: Date
   status: 'draft' | 'sending' | 'completed' | 'paused'
 }
