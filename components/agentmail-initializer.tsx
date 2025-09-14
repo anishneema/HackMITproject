@@ -2,7 +2,6 @@
 
 import { useEffect, useRef } from 'react'
 import { agentMailService } from '@/lib/agent-mail-service'
-import { addSampleEvents } from '@/lib/sample-data'
 
 export function AgentMailInitializer() {
   const initialized = useRef(false)
@@ -14,8 +13,7 @@ export function AgentMailInitializer() {
     initialized.current = true
     const initializeAgentMail = async () => {
       try {
-        // Add sample data for demo
-        addSampleEvents()
+        // Sample data removed - using real API data
 
         // Initialize AgentMail service with API key from environment
         const apiKey = process.env.NEXT_PUBLIC_AGENT_MAIL_API_KEY || process.env.AGENT_MAIL_API_KEY

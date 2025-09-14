@@ -1,96 +1,82 @@
 "use client"
 
-import { useMemo } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Bot, Mail, MessageSquare, Users, MapPin, CheckCircle, Clock, AlertTriangle, TrendingUp } from "lucide-react"
-import { useDashboardStore } from "@/lib/dashboard-store"
+import { Button } from "@/components/ui/button"
+import { Bot, Mail, MessageSquare, Users, MapPin, CheckCircle, Clock, AlertTriangle, TrendingUp, RefreshCw } from "lucide-react"
+import { useDashboardData } from "@/lib/use-dashboard-data"
 import { EmailInsightsPanel } from "@/components/email-insights-panel"
+import { apiService } from "@/lib/api-service"
 
 export function MonitoringDashboard() {
-  const events = useDashboardStore((state) => state.events)
-  const campaigns = useDashboardStore((state) => state.campaigns)
-  const bookings = useDashboardStore((state) => state.bookings)
+  const { events, campaigns, bookings, activities, isLoading, error, totals, initialized, refreshDashboard } = useDashboardData()
+  const [metricsChanges, setMetricsChanges] = useState({
+    emailsSent: '+0%',
+    responseRate: '+0%',
+    activeEvents: '+0%',
+    totalBookings: '+0%'
+  })
 
-  const totals = useMemo(() => {
-    const activeEvents = events.filter(e => e.status === 'active').length
-    const totalEmailsSent = events.reduce((sum, event) => sum + (event.emailsSent || 0), 0)
-    const totalEmailsReplied = events.reduce((sum, event) => sum + (event.emailsReplied || 0), 0)
-    const averageResponseRate = totalEmailsSent > 0 ? (totalEmailsReplied / totalEmailsSent) * 100 : 0
-
-    const recentActivity = bookings.slice(-10).map(booking => ({
-      type: 'booking_received' as const,
-      eventName: events.find(e => e.id === booking.eventId)?.name || 'Unknown Event',
-      timestamp: booking.bookingDate,
-      details: `${booking.participantName} booked for ${booking.eventDate.toLocaleDateString()}`
-    })).sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).slice(0, 5)
-
-    return {
-      totalEvents: events.length,
-      activeEvents,
-      totalEmailsSent,
-      averageResponseRate,
-      totalBookings: bookings.length,
-      recentActivity
+  // Load metrics changes
+  useEffect(() => {
+    if (initialized) {
+      apiService.getMetricsChanges()
+        .then(setMetricsChanges)
+        .catch(error => console.error('Failed to load metrics changes:', error))
     }
-  }, [events, campaigns, bookings])
-  const aiActivities = [
-    {
-      id: 1,
-      action: "Venue Research Completed",
-      details: "Found 12 suitable venues for September drives, sent 5 booking requests",
-      timestamp: "2 minutes ago",
-      status: "completed",
-      type: "venue",
-    },
-    {
-      id: 2,
-      action: "Email Campaign Launched",
-      details: "Sent 447 personalized invitations across 5 active drives",
-      timestamp: "15 minutes ago",
-      status: "active",
-      type: "email",
-    },
-    {
-      id: 3,
-      action: "RSVP Follow-up Scheduled",
-      details: "Automated reminders set for 127 non-responders",
-      timestamp: "1 hour ago",
-      status: "scheduled",
-      type: "followup",
-    },
-    {
-      id: 4,
-      action: "Venue Confirmation Received",
-      details: "Community Center Hall confirmed for Sep 14, contract sent",
-      timestamp: "2 hours ago",
-      status: "completed",
-      type: "venue",
-    },
-    {
-      id: 5,
-      action: "Volunteer Assignment Optimized",
-      details: "AI redistributed 6 volunteers to balance workload",
-      timestamp: "3 hours ago",
-      status: "completed",
-      type: "volunteer",
-    },
-    {
-      id: 6,
-      action: "SMS Campaign Initiated",
-      details: "Sent 189 SMS reminders for upcoming drives",
-      timestamp: "4 hours ago",
-      status: "active",
-      type: "sms",
-    },
-  ]
+  }, [initialized, totals])
+
+  if (!initialized && isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">
+          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2" />
+          <p>Loading dashboard data...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">
+          <AlertTriangle className="h-8 w-8 text-destructive mx-auto mb-2" />
+          <p className="text-destructive mb-4">Error loading dashboard: {error}</p>
+          <Button onClick={refreshDashboard} variant="outline">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Retry
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  // Format activities for display
+  const formatTimestamp = (timestamp: Date) => {
+    const now = new Date()
+    const diff = now.getTime() - timestamp.getTime()
+    const minutes = Math.floor(diff / 60000)
+    const hours = Math.floor(diff / 3600000)
+    const days = Math.floor(diff / 86400000)
+
+    if (minutes < 60) return `${minutes} minute${minutes !== 1 ? 's' : ''} ago`
+    if (hours < 24) return `${hours} hour${hours !== 1 ? 's' : ''} ago`
+    return `${days} day${days !== 1 ? 's' : ''} ago`
+  }
+
+  const aiActivities = activities.slice(0, 6).map(activity => ({
+    ...activity,
+    timestamp: formatTimestamp(activity.timestamp)
+  }))
 
   const campaignMetrics = [
-    { label: "Emails Sent", value: totals.totalEmailsSent, change: "+18%", icon: Mail },
-    { label: "Response Rate", value: `${totals.averageResponseRate.toFixed(1)}%`, change: "+12%", icon: MessageSquare },
-    { label: "Active Events", value: totals.activeEvents, change: "+28%", icon: Users },
-    { label: "Total Bookings", value: totals.totalBookings, change: "+22%", icon: CheckCircle },
+    { label: "Emails Sent", value: totals.totalEmailsSent, change: metricsChanges.emailsSent, icon: Mail },
+    { label: "Response Rate", value: `${totals.averageResponseRate.toFixed(1)}%`, change: metricsChanges.responseRate, icon: MessageSquare },
+    { label: "Active Events", value: totals.activeEvents, change: metricsChanges.activeEvents, icon: Users },
+    { label: "Total Bookings", value: totals.totalBookings, change: metricsChanges.totalBookings, icon: CheckCircle },
   ]
 
   const getStatusIcon = (status: string) => {

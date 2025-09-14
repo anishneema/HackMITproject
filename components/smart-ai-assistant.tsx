@@ -12,7 +12,6 @@ import { CSVReader } from "@/lib/email-automation/csv-reader"
 import { agentMailService } from "@/lib/agent-mail-service"
 import { Bot, User, Send, Upload, Calendar, MapPin, Mail, Users, CheckCircle, Clock, AlertCircle, BarChart } from "lucide-react"
 import { ChatSidebar } from "./chat-sidebar"
-// import "@/lib/sample-data" // Initialize sample data - temporarily disabled for debugging
 
 export function SmartAIAssistant() {
   const [inputValue, setInputValue] = useState("")
@@ -36,7 +35,7 @@ export function SmartAIAssistant() {
 
   // Get dashboard data
   const dashboardStore = useDashboardStore()
-  const { events, campaigns, bookings, getDashboardTotals, addEvent, onEmailSent } = dashboardStore
+  const { events, campaigns, bookings, getDashboardTotals, addEvent, onEmailSent, createEventAPI, createActivity } = dashboardStore
 
   // Create initial session if none exists
   useEffect(() => {
@@ -166,7 +165,7 @@ export function SmartAIAssistant() {
         emailsReplied: 0
       })
 
-      const newEventId = addEvent({
+      const newEventId = await createEventAPI({
         name: eventName,
         date: eventDate,
         time: eventTime,
@@ -181,6 +180,15 @@ export function SmartAIAssistant() {
 
       console.log("Created event with ID:", newEventId)
       console.log("Total events after creation:", events.length)
+
+      // Log AI activity
+      await createActivity({
+        action: "Blood Drive Event Created",
+        details: `Created "${eventName}" at ${venue} for ${eventDate} targeting ${targetDonors} donors`,
+        status: "completed",
+        type: "ai_response",
+        eventId: newEventId
+      })
 
       // Update the AI response actions to show completion
       if (aiResponse.actions) {
@@ -256,7 +264,7 @@ export function SmartAIAssistant() {
       // Create a sample event for the campaign if none exists
       let eventId = events.length > 0 ? events[0].id : null
       if (!eventId) {
-        eventId = addEvent({
+        eventId = await createEventAPI({
           name: "Blood Drive Campaign",
           date: "This Saturday",
           time: "9:00 AM",
@@ -316,7 +324,16 @@ Red Cross Events Team`
         if (emailResponse.ok) {
           const result = await emailResponse.json()
           console.log('Emails sent successfully via SMTP:', result)
-          
+
+          // Log AI activity for email campaign
+          await createActivity({
+            action: "Email Campaign Launched",
+            details: `Sent ${result.details?.sent || contacts.length} personalized invitations to blood drive`,
+            status: result.success ? "completed" : "active",
+            type: "email",
+            eventId
+          })
+
           // Update the AI response to include email sending success
           const successMessage = result.success 
             ? `📧 I've sent personalized emails to all ${contacts.length} contacts! They will receive invitations to our blood drive event in their inbox.`

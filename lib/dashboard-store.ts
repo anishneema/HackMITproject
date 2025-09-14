@@ -1,6 +1,7 @@
 'use client'
 
 import { create } from 'zustand'
+import { apiService } from './api-service'
 
 export interface DashboardEvent {
   id: string
@@ -50,16 +51,41 @@ export interface CalendarBooking {
   source: 'email_response' | 'direct_booking' | 'phone' | 'other'
 }
 
+export interface AIActivity {
+  id: string
+  action: string
+  details: string
+  timestamp: Date
+  status: 'completed' | 'active' | 'scheduled' | 'failed'
+  type: 'venue' | 'email' | 'followup' | 'volunteer' | 'sms' | 'ai_response' | 'booking' | 'campaign'
+  eventId?: string
+}
+
 export interface DashboardStore {
   events: DashboardEvent[]
   campaigns: EmailCampaignStats[]
   bookings: CalendarBooking[]
+  activities: AIActivity[]
+  isLoading: boolean
+  error: string | null
+
+  // Local store methods
   addEvent: (event: Omit<DashboardEvent, 'id' | 'createdAt' | 'updatedAt'>) => string
   updateEvent: (eventId: string, updates: Partial<DashboardEvent>) => void
   onEmailSent: (eventId: string, count: number) => void
   onEmailOpened: (eventId: string, count: number) => void
   onEmailReplied: (eventId: string, reply: { sentiment: string; participantEmail: string; content?: string }) => void
   onBookingReceived: (eventId: string, booking: { participantEmail: string; participantName: string; eventDate: Date }) => void
+
+  // API methods
+  loadEvents: () => Promise<void>
+  loadCampaigns: () => Promise<void>
+  loadBookings: () => Promise<void>
+  loadActivities: () => Promise<void>
+  refreshDashboard: () => Promise<void>
+  createEventAPI: (event: Omit<DashboardEvent, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>
+  createActivity: (activity: Omit<AIActivity, 'id' | 'timestamp'>) => Promise<void>
+
   getDashboardTotals: () => {
     totalEvents: number
     activeEvents: number
@@ -81,6 +107,9 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   events: [],
   campaigns: [],
   bookings: [],
+  activities: [],
+  isLoading: false,
+  error: null,
 
   addEvent: (eventData) => {
     const id = generateId()
@@ -175,6 +204,127 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
           : event
       )
     }))
+  },
+
+  // API methods
+  loadEvents: async () => {
+    try {
+      set({ isLoading: true, error: null })
+      const apiEvents = await apiService.getEvents()
+      const events = apiEvents.map(event => ({
+        ...event,
+        lastEmailSent: event.lastEmailSent ? new Date(event.lastEmailSent) : undefined,
+        createdAt: new Date(event.createdAt),
+        updatedAt: new Date(event.updatedAt)
+      }))
+      set({ events, isLoading: false })
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Failed to load events',
+        isLoading: false
+      })
+    }
+  },
+
+  loadCampaigns: async () => {
+    try {
+      set({ isLoading: true, error: null })
+      const apiCampaigns = await apiService.getCampaigns()
+      const campaigns = apiCampaigns.map(campaign => ({
+        ...campaign,
+        lastActivity: new Date(campaign.lastActivity)
+      }))
+      set({ campaigns, isLoading: false })
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Failed to load campaigns',
+        isLoading: false
+      })
+    }
+  },
+
+  loadBookings: async () => {
+    try {
+      set({ isLoading: true, error: null })
+      const apiBookings = await apiService.getBookings()
+      const bookings = apiBookings.map(booking => ({
+        ...booking,
+        bookingDate: new Date(booking.bookingDate),
+        eventDate: new Date(booking.eventDate)
+      }))
+      set({ bookings, isLoading: false })
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Failed to load bookings',
+        isLoading: false
+      })
+    }
+  },
+
+  loadActivities: async () => {
+    try {
+      set({ isLoading: true, error: null })
+      const apiActivities = await apiService.getActivities()
+      const activities = apiActivities.map(activity => ({
+        ...activity,
+        timestamp: new Date(activity.timestamp)
+      }))
+      set({ activities, isLoading: false })
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Failed to load activities',
+        isLoading: false
+      })
+    }
+  },
+
+  refreshDashboard: async () => {
+    const { loadEvents, loadCampaigns, loadBookings, loadActivities } = get()
+    await Promise.all([
+      loadEvents(),
+      loadCampaigns(),
+      loadBookings(),
+      loadActivities()
+    ])
+  },
+
+  createActivity: async (activityData) => {
+    try {
+      const apiActivity = await apiService.createActivity(activityData)
+      const activity = {
+        ...apiActivity,
+        timestamp: new Date(apiActivity.timestamp)
+      }
+      set(state => ({
+        activities: [activity, ...state.activities]
+      }))
+    } catch (error) {
+      console.error('Failed to create activity:', error)
+    }
+  },
+
+  createEventAPI: async (eventData) => {
+    try {
+      set({ isLoading: true, error: null })
+      const apiEvent = await apiService.createEvent(eventData)
+      const event = {
+        ...apiEvent,
+        lastEmailSent: apiEvent.lastEmailSent ? new Date(apiEvent.lastEmailSent) : undefined,
+        createdAt: new Date(apiEvent.createdAt),
+        updatedAt: new Date(apiEvent.updatedAt)
+      }
+      set(state => ({
+        events: [...state.events, event],
+        isLoading: false
+      }))
+      return event.id
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Failed to create event',
+        isLoading: false
+      })
+      throw error
+    }
   },
 
   getDashboardTotals: () => {

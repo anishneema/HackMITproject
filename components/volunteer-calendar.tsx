@@ -1,124 +1,75 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Calendar, ChevronLeft, ChevronRight, Clock, Users, MapPin, Phone, Mail, MessageSquare } from "lucide-react"
+import { Calendar, ChevronLeft, ChevronRight, Clock, Users, MapPin, Phone, Mail, MessageSquare, RefreshCw } from "lucide-react"
 import { useDashboardStore } from "@/lib/dashboard-store"
+import { apiService, APIVolunteer } from "@/lib/api-service"
 
 export function VolunteerCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [volunteers, setVolunteers] = useState<APIVolunteer[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
   const bookings = useDashboardStore((state) => state.bookings)
 
-  // Sample volunteer data with 2025 dates
-  const volunteers = [
-    {
-      id: 1,
-      name: "Sarah Johnson",
-      role: "Nurse",
-      avatar: "/placeholder.svg?height=32&width=32",
-      shifts: [
-        { date: "2025-09-14", time: "9:00 AM - 1:00 PM", event: "Community Center Drive" },
-        { date: "2025-09-18", time: "10:00 AM - 2:00 PM", event: "University Campus Drive" },
-        { date: "2025-09-25", time: "8:00 AM - 12:00 PM", event: "Mall Plaza Drive" },
-      ],
-    },
-    {
-      id: 2,
-      name: "Mike Chen",
-      role: "Registration",
-      avatar: "/placeholder.svg?height=32&width=32",
-      shifts: [
-        { date: "2025-09-14", time: "8:30 AM - 12:30 PM", event: "Community Center Drive" },
-        { date: "2025-09-20", time: "12:00 PM - 4:00 PM", event: "Corporate Office Drive" },
-        { date: "2025-09-28", time: "9:30 AM - 1:30 PM", event: "Tech Campus Drive" },
-      ],
-    },
-    {
-      id: 3,
-      name: "Emily Rodriguez",
-      role: "Phlebotomist",
-      avatar: "/placeholder.svg?height=32&width=32",
-      shifts: [
-        { date: "2025-09-14", time: "9:00 AM - 1:00 PM", event: "Community Center Drive" },
-        { date: "2025-09-18", time: "10:00 AM - 2:00 PM", event: "University Campus Drive" },
-        { date: "2025-09-20", time: "1:00 PM - 5:00 PM", event: "Corporate Office Drive" },
-        { date: "2025-09-25", time: "8:30 AM - 12:30 PM", event: "Mall Plaza Drive" },
-      ],
-    },
-    {
-      id: 4,
-      name: "David Park",
-      role: "Setup Crew",
-      avatar: "/placeholder.svg?height=32&width=32",
-      shifts: [
-        { date: "2025-09-14", time: "7:00 AM - 11:00 AM", event: "Community Center Drive" },
-        { date: "2025-09-18", time: "8:00 AM - 12:00 PM", event: "University Campus Drive" },
-        { date: "2025-09-20", time: "11:00 AM - 3:00 PM", event: "Corporate Office Drive" },
-      ],
-    },
-    {
-      id: 5,
-      name: "Lisa Thompson",
-      role: "Medical Assistant",
-      avatar: "/placeholder.svg?height=32&width=32",
-      shifts: [
-        { date: "2025-09-18", time: "9:30 AM - 1:30 PM", event: "University Campus Drive" },
-        { date: "2025-09-25", time: "10:00 AM - 2:00 PM", event: "Mall Plaza Drive" },
-        { date: "2025-09-28", time: "8:00 AM - 12:00 PM", event: "Tech Campus Drive" },
-      ],
-    },
-    {
-      id: 6,
-      name: "James Wilson",
-      role: "Cleanup Crew",
-      avatar: "/placeholder.svg?height=32&width=32",
-      shifts: [
-        { date: "2025-09-14", time: "12:30 PM - 4:30 PM", event: "Community Center Drive" },
-        { date: "2025-09-20", time: "3:00 PM - 7:00 PM", event: "Corporate Office Drive" },
-        { date: "2025-09-28", time: "1:00 PM - 5:00 PM", event: "Tech Campus Drive" },
-      ],
-    },
-  ]
+  // Load volunteers from API
+  useEffect(() => {
+    const loadVolunteers = async () => {
+      try {
+        setIsLoading(true)
+        const apiVolunteers = await apiService.getVolunteers()
+        setVolunteers(apiVolunteers)
+      } catch (error) {
+        console.error('Failed to load volunteers:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
 
-  const events = [
-    {
-      date: "2025-09-14",
-      name: "Community Center Drive",
-      location: "Community Center Hall",
-      volunteers: volunteers.filter((v) => v.shifts.some((s) => s.date === "2025-09-14")),
-    },
-    {
-      date: "2025-09-18",
-      name: "University Campus Drive",
-      location: "University Student Center",
-      volunteers: volunteers.filter((v) => v.shifts.some((s) => s.date === "2025-09-18")),
-    },
-    {
-      date: "2025-09-20",
-      name: "Corporate Office Drive",
-      location: "TechCorp Headquarters",
-      volunteers: volunteers.filter((v) => v.shifts.some((s) => s.date === "2025-09-20")),
-    },
-    {
-      date: "2025-09-25",
-      name: "Mall Plaza Drive",
-      location: "Central Mall Atrium",
-      volunteers: volunteers.filter((v) => v.shifts.some((s) => s.date === "2025-09-25")),
-    },
-    {
-      date: "2025-09-28",
-      name: "Tech Campus Drive",
-      location: "Innovation Tech Campus",
-      volunteers: volunteers.filter((v) => v.shifts.some((s) => s.date === "2025-09-28")),
-    },
-  ]
+    loadVolunteers()
+  }, [])
+
+  // Generate events from volunteer shifts dynamically
+  const generateEventsFromVolunteers = (volunteers: APIVolunteer[]) => {
+    const eventMap = new Map()
+
+    volunteers.forEach(volunteer => {
+      volunteer.shifts.forEach(shift => {
+        if (!eventMap.has(shift.date)) {
+          eventMap.set(shift.date, {
+            date: shift.date,
+            name: shift.event,
+            location: getLocationForEvent(shift.event),
+            volunteers: []
+          })
+        }
+        eventMap.get(shift.date).volunteers.push(volunteer)
+      })
+    })
+
+    return Array.from(eventMap.values())
+  }
+
+  const getLocationForEvent = (eventName: string) => {
+    const locationMap: { [key: string]: string } = {
+      "Community Center Drive": "Community Center Hall",
+      "University Campus Drive": "University Student Center",
+      "Corporate Office Drive": "TechCorp Headquarters",
+      "Mall Plaza Drive": "Central Mall Atrium",
+      "Tech Campus Drive": "Innovation Tech Campus"
+    }
+    return locationMap[eventName] || "Location TBD"
+  }
+
+  // Generate events dynamically from volunteer data
+  const events = generateEventsFromVolunteers(volunteers)
 
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear()
@@ -358,29 +309,42 @@ export function VolunteerCalendar() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {volunteers.map((volunteer) => (
-              <div key={volunteer.id} className="flex items-center justify-between p-3 border rounded-lg">
-                <div className="flex items-center gap-3">
-                  <Avatar>
-                    <AvatarImage src={volunteer.avatar || "/placeholder.svg"} />
-                    <AvatarFallback>
-                      {volunteer.name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-medium">{volunteer.name}</p>
-                    <p className="text-sm text-muted-foreground">{volunteer.role}</p>
+            {isLoading ? (
+              <div className="flex items-center justify-center p-8">
+                <RefreshCw className="h-6 w-6 animate-spin" />
+              </div>
+            ) : volunteers.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">
+                No volunteers found. Add volunteers to see them here.
+              </p>
+            ) : (
+              volunteers.map((volunteer) => (
+                <div key={volunteer.id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Avatar>
+                      <AvatarImage src={volunteer.avatar || "/placeholder.svg"} />
+                      <AvatarFallback>
+                        {volunteer.name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium">{volunteer.name}</p>
+                      <p className="text-sm text-muted-foreground">{volunteer.role}</p>
+                      {volunteer.email && (
+                        <p className="text-xs text-muted-foreground">{volunteer.email}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-medium">{volunteer.shifts.length} shifts</p>
+                    <p className="text-xs text-muted-foreground">This month</p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium">{volunteer.shifts.length} shifts</p>
-                  <p className="text-xs text-muted-foreground">This month</p>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </CardContent>
         </Card>
 
